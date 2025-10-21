@@ -1,0 +1,9 @@
+body { font-family: Arial, sans-serif; background-color: #f0f8ff; color: #333; margin: 20px; }
+h1 { color: #4CAF50; }
+ul { list-style-type: none; padding: 0; }
+li { background: #e8f5e8; margin: 5px 0; padding: 10px; border-radius: 5px; }
+a { color: #2196F3; text-decoration: none; margin: 0 10px; }
+a:hover { text-decoration: underline; }
+form { background: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+input[type="submit"] { background: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
+input[type="submit"]:hover { background: #45a049; }
