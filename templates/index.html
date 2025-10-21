@@ -15,15 +15,18 @@
         .navbar {
             background: linear-gradient(90deg, #28a745 0%, #20c997 100%) !important;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: margin-left 0.3s ease;
         }
         .sidebar {
             height: 100%;
             position: fixed;
             top: 0;
-            left: 0;
+            left: -250px; /* Inicialmente escondido */
             width: 250px;
             background-color: #343a40;
             padding-top: 20px;
+            transition: left 0.3s ease;
+            z-index: 1000;
         }
         .sidebar a {
             padding: 10px 15px;
@@ -37,8 +40,9 @@
             background-color: #495057;
         }
         .content {
-            margin-left: 260px; /* Espaço para a sidebar */
+            margin-left: 0; /* Inicialmente sem margem */
             padding: 20px;
+            transition: margin-left 0.3s ease;
         }
         .card {
             border: none;
@@ -55,6 +59,14 @@
             border-radius: 15px 15px 0 0 !important;
             color: white;
             font-weight: bold;
+        }
+        .btn {
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: scale(1.05);
         }
         .badge {
             font-size: 0.9em;
@@ -110,9 +122,12 @@
         <div class="container d-flex justify-content-between">
             <a class="navbar-brand" href="#"><i class="fas fa-seedling"></i> Estoque de Flores</a>
             <span class="navbar-text text-white">Created by Vitor Manoel</span>
+            <button class="navbar-toggler" type="button" onclick="toggleSidebar()">
+                <span class="navbar-toggler-icon"></span>
+            </button>
         </div>
     </nav>
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <a href="/adicionar"><i class="fas fa-plus"></i> Adicionar Flor</a>
         <a href="/saida"><i class="fas fa-minus"></i> Registrar Saída</a>
         <a href="/remover"><i class="fas fa-trash"></i> Remover Expiradas</a>
@@ -120,7 +135,7 @@
         <a href="/historico-entradas"><i class="fas fa-history"></i> Histórico de Entradas</a>
         <button onclick="window.open('/relatorio', '_blank')" class="btn btn-info"><i class="fas fa-print"></i> Imprimir Relatório</button>
     </div>
-    <div class="content">
+    <div class="content" id="content">
         <div class="container mt-5">
             <div class="row justify-content-center">
                 <div class="col-lg-10">
@@ -193,6 +208,19 @@
                 }
             });
         });
+
+        // Função para abrir/fechar a sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const content = document.getElementById('content');
+            if (sidebar.style.left === '0px') {
+                sidebar.style.left = '-250px'; // Esconder
+                content.style.marginLeft = '0'; // Ajustar conteúdo
+            } else {
+                sidebar.style.left = '0px'; // Mostrar
+                content.style.marginLeft = '250px'; // Ajustar conteúdo
+            }
+        }
     </script>
 </body>
 </html>
