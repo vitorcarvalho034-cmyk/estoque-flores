@@ -16,6 +16,30 @@
             background: linear-gradient(90deg, #28a745 0%, #20c997 100%) !important;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
+        .sidebar {
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 250px;
+            background-color: #343a40;
+            padding-top: 20px;
+        }
+        .sidebar a {
+            padding: 10px 15px;
+            text-decoration: none;
+            font-size: 1.1em;
+            color: white;
+            display: block;
+            transition: background 0.3s;
+        }
+        .sidebar a:hover {
+            background-color: #495057;
+        }
+        .content {
+            margin-left: 260px; /* Espaço para a sidebar */
+            padding: 20px;
+        }
         .card {
             border: none;
             border-radius: 15px;
@@ -31,14 +55,6 @@
             border-radius: 15px 15px 0 0 !important;
             color: white;
             font-weight: bold;
-        }
-        .btn {
-            border-radius: 25px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .btn:hover {
-            transform: scale(1.05);
         }
         .badge {
             font-size: 0.9em;
@@ -96,65 +112,66 @@
             <span class="navbar-text text-white">Created by Vitor Manoel</span>
         </div>
     </nav>
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-lg-10">
-                <!-- Alertas -->
-                {% if alertas %}
-                <div class="alert alerta no-print" role="alert">
-                    <h5><i class="fas fa-exclamation-triangle"></i> Alertas de Expiração</h5>
-                    <ul class="mb-0">
-                        {% for alerta in alertas %}
-                        <li>{{ alerta.variedade }} - Expira em {{ alerta.dias_para_expirar }} dia(s) ({{ alerta.data_maxima.strftime('%d/%m/%Y') }})</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="mb-0"><i class="fas fa-boxes"></i> Estoque Atual (Lotes por Data)</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-flex flex-wrap justify-content-center gap-2 mb-4 no-print">
-                            <a href="/adicionar" class="btn btn-success"><i class="fas fa-plus"></i> Adicionar Flor</a>
-                            <a href="/saida" class="btn btn-warning"><i class="fas fa-minus"></i> Registrar Saída</a>
-                            <a href="/remover" class="btn btn-danger"><i class="fas fa-trash"></i> Remover Expiradas</a>
-                            <a href="/filtrar-semana" class="btn btn-info"><i class="fas fa-calendar-week"></i> Filtrar por Semana</a>
-                            <a href="/historico-entradas" class="btn btn-secondary"><i class="fas fa-history"></i> Histórico de Entradas</a>
-                            <button onclick="window.open('/relatorio', '_blank')" class="btn btn-dark"><i class="fas fa-print"></i> Imprimir Relatório</button>
-                        </div>
-                        <!-- Campo de Busca/Filtro -->
-                        <div class="mb-4 no-print">
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                <input type="text" id="filtro" class="form-control" placeholder="Buscar por variedade ou data (ex.: rosa ou 14/10)">
-                            </div>
-                        </div>
-                        {% if lotes %}
-                        <ul class="list-group list-group-flush" id="lista-lotes">
-                            {% for lote in lotes %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center lote-item" data-variedade="{{ lote.variedade }}" data-data="{{ lote.data_colheita.strftime('%d/%m/%Y') }}">
-                                <div>
-                                    <strong><i class="fas fa-flower"></i> {{ lote.variedade }}</strong> - Quantidade: {{ lote.quantidade }}<br>
-                                    <small class="text-muted">Colheita: {{ lote.data_colheita.strftime('%d/%m/%Y') }} | Máxima: {{ lote.data_maxima.strftime('%d/%m/%Y') }} ({{ lote.dias_para_expirar }} dia(s) para expirar)</small>
-                                </div>
-                                <span class="badge bg-{% if lote.expirada %}danger{% else %}success{% endif %}">
-                                    {% if lote.expirada %}<i class="fas fa-times"></i> Expirada{% else %}<i class="fas fa-check"></i> Válida{% endif %}
-                                </span>
-                            </li>
+    <div class="sidebar">
+        <a href="/adicionar"><i class="fas fa-plus"></i> Adicionar Flor</a>
+        <a href="/saida"><i class="fas fa-minus"></i> Registrar Saída</a>
+        <a href="/remover"><i class="fas fa-trash"></i> Remover Expiradas</a>
+        <a href="/filtrar-semana"><i class="fas fa-calendar-week"></i> Filtrar por Semana</a>
+        <a href="/historico-entradas"><i class="fas fa-history"></i> Histórico de Entradas</a>
+        <button onclick="window.open('/relatorio', '_blank')" class="btn btn-info"><i class="fas fa-print"></i> Imprimir Relatório</button>
+    </div>
+    <div class="content">
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <!-- Alertas -->
+                    {% if alertas %}
+                    <div class="alert alerta no-print" role="alert">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Alertas de Expiração</h5>
+                        <ul class="mb-0">
+                            {% for alerta in alertas %}
+                            <li>{{ alerta.variedade }} - Expira em {{ alerta.dias_para_expirar }} dia(s) ({{ alerta.data_maxima.strftime('%d/%m/%Y') }})</li>
                             {% endfor %}
                         </ul>
-                        <!-- Somatória Total -->
-                        <div class="total-sum">
-                            <i class="fas fa-calculator"></i> Total de Flores no Estoque: {{ total_quantidade }}
+                    </div>
+                    {% endif %}
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="mb-0"><i class="fas fa-boxes"></i> Estoque Atual (Lotes por Data)</h4>
                         </div>
-                        {% else %}
-                        <div class="text-center py-5">
-                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">Estoque vazio. Adicione flores!</p>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text" id="filtro" class="form-control" placeholder="Buscar por variedade ou data (ex.: rosa ou 14/10)">
+                                </div>
+                            </div>
+                            {% if lotes %}
+                            <ul class="list-group list-group-flush" id="lista-lotes">
+                                {% for lote in lotes %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center lote-item" data-variedade="{{ lote.variedade }}" data-data="{{ lote.data_colheita.strftime('%d/%m/%Y') }}">
+                                    <div>
+                                        <strong><i class="fas fa-flower"></i> {{ lote.variedade }}</strong> - Quantidade: {{ lote.quantidade }}<br>
+                                        <small class="text-muted">Colheita: {{ lote.data_colheita.strftime('%d/%m/%Y') }} | Máxima: {{ lote.data_maxima.strftime('%d/%m/%Y') }} ({{ lote.dias_para_expirar }} dia(s) para expirar)</small>
+                                    </div>
+                                    <span class="badge bg-{% if lote.expirada %}danger{% else %}success{% endif %}">
+                                        {% if lote.expirada %}<i class="fas fa-times"></i> Expirada{% else %}<i class="fas fa-check"></i> Válida{% endif %}
+                                    </span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            <!-- Somatória Total -->
+                            <div class="total-sum">
+                                <i class="fas fa-calculator"></i> Total de Flores no Estoque: {{ total_quantidade }}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">Estoque vazio. Adicione flores!</p>
+                            </div>
+                            {% endif %}
                         </div>
-                        {% endif %}
                     </div>
                 </div>
             </div>
