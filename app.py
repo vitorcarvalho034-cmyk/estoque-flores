@@ -49,6 +49,39 @@ def carregar_estoque():
     except FileNotFoundError:
         estoque = []
 
+# Funções para histórico de entradas (SQLite)
+def init_db():
+    conn = sqlite3.connect('entradas.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS entradas (
+                    id INTEGER PRIMARY KEY,
+                    variedade TEXT,
+                    quantidade INTEGER,
+                    data_colheita TEXT,
+                    data_entrada TEXT
+                )''')
+    conn.commit()
+    conn.close()
+
+def salvar_entrada(variedade, quantidade, data_colheita):
+    conn = sqlite3.connect('entradas.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO entradas (variedade, quantidade, data_colheita, data_entrada) VALUES (?, ?, ?, ?)",
+              (variedade, quantidade, data_colheita, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+def carregar_entradas():
+    conn = sqlite3.connect('entradas.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM entradas ORDER BY data_entrada DESC")
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+# Inicializar DB
+init_db()
+
 # Carregar dados ao iniciar
 carregar_estoque()
 
@@ -84,7 +117,8 @@ def adicionar():
         quantidade = request.form['quantidade']
         flor = Flor(variedade, data, quantidade)
         estoque.append(flor)
-        salvar_estoque()  # Salvar após adicionar
+        salvar_estoque()  # Salvar estoque
+        salvar_entrada(variedade, quantidade, data)  # Salvar entrada no histórico
         return redirect(url_for('index'))
     return render_template('adicionar.html')
 
