@@ -135,7 +135,5 @@ def relatorio():
     return render_template('relatorio.html', lotes=lotes, total_quantidade=total_quantidade, now=datetime.now())
 
 if __name__ == '__main__':
-    app.run(debug=True)
-if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
