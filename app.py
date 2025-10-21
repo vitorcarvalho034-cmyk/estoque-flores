@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from flask import Flask, render_template, request, redirect, url_for
 from datetime import datetime, timedelta
 
@@ -48,6 +49,39 @@ def carregar_estoque():
     except FileNotFoundError:
         estoque = []
 
+# Funções para histórico de entradas (SQLite)
+def init_db():
+    conn = sqlite3.connect('entradas.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS entradas (
+                    id INTEGER PRIMARY KEY,
+                    variedade TEXT,
+                    quantidade INTEGER,
+                    data_colheita TEXT,
+                    data_entrada TEXT
+                )''')
+    conn.commit()
+    conn.close()
+
+def salvar_entrada(variedade, quantidade, data_colheita):
+    conn = sqlite3.connect('entradas.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO entradas (variedade, quantidade, data_colheita, data_entrada) VALUES (?, ?, ?, ?)",
+              (variedade, quantidade, data_colheita, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+def carregar_entradas():
+    conn = sqlite3.connect('entradas.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM entradas ORDER BY data_entrada DESC")
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+# Inicializar DB
+init_db()
+
 # Carregar dados ao iniciar
 carregar_estoque()
 
@@ -83,7 +117,8 @@ def adicionar():
         quantidade = request.form['quantidade']
         flor = Flor(variedade, data, quantidade)
         estoque.append(flor)
-        salvar_estoque()  # Salvar após adicionar
+        salvar_estoque()  # Salvar estoque
+        salvar_entrada(variedade, quantidade, data)  # Salvar entrada no histórico
         return redirect(url_for('index'))
     return render_template('adicionar.html')
 
@@ -134,6 +169,31 @@ def relatorio():
     lotes.sort(key=lambda x: (x['variedade'], x['data_colheita']))
     return render_template('relatorio.html', lotes=lotes, total_quantidade=total_quantidade, now=datetime.now())
 
+@app.route('/filtrar-semana', methods=['GET', 'POST'])
+def filtrar_semana():
+    lotes_filtrados = []
+    semana_selecionada = None
+    if request.method == 'POST':
+        semana_inicio = request.form['semana']
+        semana_inicio_dt = datetime.strptime(semana_inicio, "%Y-%m-%d")
+        semana_fim = semana_inicio_dt + timedelta(days=6)
+        semana_selecionada = f"{semana_inicio_dt.strftime('%d/%m/%Y')} - {semana_fim.strftime('%d/%m/%Y')}"
+        for flor in estoque:
+            if semana_inicio_dt.date() <= flor.data_colheita.date() <= semana_fim.date():
+                lotes_filtrados.append({
+                    'variedade': flor.variedade,
+                    'quantidade': flor.quantidade,
+                    'data_colheita': flor.data_colheita.date(),
+                    'data_maxima': flor.data_maxima.date(),
+                    'expirada': flor.esta_expirada(),
+                    'dias_para_expirar': flor.dias_para_expirar()
+                })
+    return render_template('filtrar_semana.html', lotes=lotes_filtrados, semana_selecionada=semana_selecionada)
+
+@app.route('/historico-entradas')
+def historico_entradas():
+    entradas = carregar_entradas()
+    return render_template('historico.html', entradas=entradas)
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(debug=True)
