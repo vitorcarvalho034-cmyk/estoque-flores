@@ -107,7 +107,7 @@ def index():
             alertas.append(lote)
     # Ordenar por variedade e data
     lotes.sort(key=lambda x: (x['variedade'], x['data_colheita']))
-    return render_template('index.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade)
+    return render_template('index.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade, now=datetime.now())
 
 @app.route('/adicionar', methods=['GET', 'POST'])
 def adicionar():
@@ -147,7 +147,7 @@ def saida():
         salvar_estoque()  # Salvar após saída
         return redirect(url_for('index'))
     # Passar lista de lotes para o template
-    lotes_disponiveis = [(i, f"{flor.variedade} - {flor.data_colheita.date()} (Qtd: {flor.quantidade})") for i, flor in enumerate(estoque)]
+    lotes_disponiveis = [(i, f"{flor.variedade} - {flor.data_colheita.strftime('%d/%m/%Y')} (Qtd: {flor.quantidade})") for i, flor in enumerate(estoque)]
     return render_template('saida.html', lotes=lotes_disponiveis)
 
 @app.route('/relatorio')

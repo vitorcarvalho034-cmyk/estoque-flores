@@ -16,6 +16,119 @@
             background: linear-gradient(90deg, #28a745 0%, #20c997 100%) !important;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
+
+        /* Overlay que aparece quando a sidebar abre */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            z-index: 998;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar {
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 250px;
+            background-color: #343a40;
+            padding-top: 20px;
+            padding-bottom: 20px;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            z-index: 999;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        /* Cabeçalho da sidebar com botão de fechar */
+        .sidebar-header {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #495057;
+        }
+
+        .sidebar-header h5 {
+            color: white;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: #28a745;
+        }
+
+        .sidebar a {
+            padding: 12px 15px;
+            text-decoration: none;
+            font-size: 1em;
+            color: white;
+            display: block;
+            transition: all 0.3s;
+            border-left: 4px solid transparent;
+        }
+
+        .sidebar a:hover {
+            background-color: #495057;
+            border-left-color: #28a745;
+            padding-left: 20px;
+        }
+
+        .sidebar .btn {
+            margin: 6px 10px;
+            width: calc(100% - 20px);
+            border-radius: 5px;
+            padding: 0.3rem 0.4rem;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar .btn i {
+            margin-right: 0.15rem;
+            font-size: 0.8rem;
+        }
+
+        .content {
+            margin-left: 0;
+            padding: 20px;
+            transition: margin-left 0.3s ease;
+        }
+
         .card {
             border: none;
             border-radius: 15px;
@@ -40,25 +153,157 @@
         .btn:hover {
             transform: scale(1.05);
         }
+        .form-control {
+            border-radius: 25px;
+            border: 2px solid #ddd;
+            transition: border-color 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #17a2b8;
+            box-shadow: 0 0 0 0.2rem rgba(23, 162, 184, 0.25);
+        }
+        .list-group-item {
+            border: none;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.8);
+            transition: background 0.3s ease;
+        }
+        .list-group-item:hover {
+            background: rgba(255,255,255,1);
+        }
+        .badge {
+            font-size: 0.9em;
+            border-radius: 20px;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+
     <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container d-flex justify-content-between">
-            <a class="navbar-brand" href="#"><i class="fas fa-seedling"></i> Estoque de Flores</a>
-            <span class="navbar-text text-white">Created by Vitor Manoel</span>
-            <button class="navbar-toggler" type="button" onclick="toggleSidebar()">
+        <div class="container-fluid d-flex align-items-center">
+            <button class="navbar-toggler me-3" type="button" onclick="toggleSidebar()" style="display: block !important; order: -1;">
                 <span class="navbar-toggler-icon"></span>
             </button>
+            <a class="navbar-brand" href="#"><i class="fas fa-seedling"></i> Estoque de Flores</a>
+            <span class="navbar-text text-white ms-auto">Created by Vitor Manoel</span>
         </div>
     </nav>
+
+    <!-- Barra Lateral -->
     <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h5>Menu</h5>
+            <button class="close-btn" onclick="toggleSidebar()">&times;</button>
+        </div>
+        <a href="/"><i class="fas fa-home"></i> Início</a>
         <a href="/adicionar"><i class="fas fa-plus"></i> Adicionar Flor</a>
         <a href="/saida"><i class="fas fa-minus"></i> Registrar Saída</a>
         <a href="/remover"><i class="fas fa-trash"></i> Remover Expiradas</a>
         <a href="/filtrar-semana"><i class="fas fa-calendar-week"></i> Filtrar por Semana</a>
         <a href="/historico-entradas"><i class="fas fa-history"></i> Histórico de Entradas</a>
-        <button onclick="window.open('/relatorio', '_blank')" class="btn btn-info"><i class="fas fa-print"></i> Imprimir Relatório</button>
+        <button onclick="window.open('/relatorio', '_blank')" class="btn btn-info" style="width: 100%; max-width: calc(100% - 24px);"><i class="fas fa-print"></i> Imprimir</button>
     </div>
+
     <div class="content" id="content">
-        <div class="container mt-
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="mb-0"><i class="fas fa-calendar-week"></i> Filtrar Flores por Semana</h4>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" class="mb-4">
+                                <div class="mb-3">
+                                    <label for="semana" class="form-label"><i class="fas fa-calendar"></i> Selecione a Semana (Data de Início)</label>
+                                    <input type="date" class="form-control" id="semana" name="semana" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Filtrar</button>
+                            </form>
+
+                            {% if semana_selecionada %}
+                            <div class="alert alert-info" role="alert">
+                                <i class="fas fa-info-circle"></i> <strong>Período Selecionado:</strong> {{ semana_selecionada }}
+                            </div>
+                            {% endif %}
+
+                            {% if lotes %}
+                            <div class="mt-4">
+                                <h5><i class="fas fa-list"></i> Flores Colhidas neste Período</h5>
+                                <ul class="list-group">
+                                    {% for lote in lotes %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong><i class="fas fa-flower"></i> {{ lote.variedade }}</strong> - Quantidade: {{ lote.quantidade }}<br>
+                                            <small class="text-muted">Colheita: {{ lote.data_colheita.strftime('%d/%m/%Y') }} | Máxima: {{ lote.data_maxima.strftime('%d/%m/%Y') }} ({{ lote.dias_para_expirar }} dia(s) para expirar)</small>
+                                        </div>
+                                        <span class="badge bg-{% if lote.expirada %}danger{% else %}success{% endif %}">
+                                            {% if lote.expirada %}<i class="fas fa-times"></i> Expirada{% else %}<i class="fas fa-check"></i> Válida{% endif %}
+                                        </span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% elif semana_selecionada %}
+                            <div class="alert alert-warning" role="alert">
+                                <i class="fas fa-exclamation-triangle"></i> Nenhuma flor foi colhida neste período.
+                            </div>
+                            {% endif %}
+
+                            <div class="text-center mt-4">
+                                <a href="/" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar ao Estoque</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Elementos do DOM
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+
+        // Função para abrir/fechar a sidebar
+        function toggleSidebar() {
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        // Fechar sidebar clicando no overlay
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        });
+
+        // Fechar sidebar ao pressionar ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            }
+        });
+
+        // Fechar sidebar ao clicar em um link
+        const sidebarLinks = document.querySelectorAll('.sidebar a');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            });
+        });
+    </script>
+</body>
+</html>
