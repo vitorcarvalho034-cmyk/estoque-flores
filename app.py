@@ -132,15 +132,16 @@ def relatorio():
 @app.route('/filtrar-semana', methods=['GET', 'POST'])
 def filtrar_semana():
     lotes_filtrados = []
-    semana_selecionada = None
+    periodo_selecionado = None
     if request.method == 'POST':
-        semana_inicio = request.form['semana']
-        semana_inicio_dt = datetime.strptime(semana_inicio, "%Y-%m-%d")
-        semana_fim = semana_inicio_dt + timedelta(days=6)
-        semana_selecionada = f"{semana_inicio_dt.strftime('%d/%m/%Y')} - {semana_fim.strftime('%d/%m/%Y')}"
+        data_inicio = request.form['data_inicio']
+        data_fim = request.form['data_fim']
+        data_inicio_dt = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        data_fim_dt = datetime.strptime(data_fim, "%Y-%m-%d").date()
+        periodo_selecionado = f"{data_inicio_dt.strftime('%d/%m/%Y')} - {data_fim_dt.strftime('%d/%m/%Y')}"
         flores = carregar_estoque()
         for flor in flores:
-            if semana_inicio_dt.date() <= flor.data_colheita <= semana_fim.date():
+            if data_inicio_dt <= flor.data_colheita <= data_fim_dt:
                 lotes_filtrados.append({
                     'variedade': flor.variedade,
                     'quantidade': flor.quantidade,
@@ -149,7 +150,7 @@ def filtrar_semana():
                     'expirada': flor.esta_expirada(),
                     'dias_para_expirar': flor.dias_para_expirar()
                 })
-    return render_template('filtrar_semana.html', lotes=lotes_filtrados, semana_selecionada=semana_selecionada)
+    return render_template('filtrar_semana.html', lotes=lotes_filtrados, periodo_selecionado=periodo_selecionado)
 
 @app.route('/historico-entradas')
 def historico_entradas():
@@ -157,4 +158,5 @@ def historico_entradas():
     return render_template('historico.html', entradas=entradas)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
