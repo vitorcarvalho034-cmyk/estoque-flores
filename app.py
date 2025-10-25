@@ -1,14 +1,19 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-# Configuração do Banco de Dados (PostgreSQL no Render)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///estoque.db')  # Fallback para SQLite local
+# Configuração do Banco de Dados
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///estoque.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+# Função para horário local (Brasília)
+def agora_local():
+    utc_now = datetime.now(timezone.utc)
+    return utc_now - timedelta(hours=3)  # Ajuste para seu fuso horário
 
 # Modelo para Flores
 class Flor(db.Model):
@@ -18,19 +23,19 @@ class Flor(db.Model):
     quantidade = db.Column(db.Integer, nullable=False)
 
     def esta_expirada(self):
-        return datetime.now().date() > (self.data_colheita + timedelta(days=7))
+        return agora_local().date() > (self.data_colheita + timedelta(days=5))  # 5 dias de validade
 
     def dias_para_expirar(self):
-        hoje = datetime.now().date()
-        return ((self.data_colheita + timedelta(days=7)) - hoje).days
+        hoje = agora_local().date()
+        return ((self.data_colheita + timedelta(days=5)) - hoje).days
 
-# Modelo para Entradas (Histórico)
+# Modelo para Entradas
 class Entrada(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     variedade = db.Column(db.String(100), nullable=False)
     quantidade = db.Column(db.Integer, nullable=False)
     data_colheita = db.Column(db.Date, nullable=False)
-    data_entrada = db.Column(db.DateTime, default=datetime.utcnow)
+    data_entrada = db.Column(db.DateTime, default=lambda: agora_local())
 
 # Criar tabelas
 with app.app_context():
@@ -62,7 +67,7 @@ def index():
             'variedade': flor.variedade,
             'quantidade': flor.quantidade,
             'data_colheita': flor.data_colheita,
-            'data_maxima': flor.data_colheita + timedelta(days=7),
+            'data_maxima': flor.data_colheita + timedelta(days=5),
             'expirada': flor.esta_expirada(),
             'dias_para_expirar': flor.dias_para_expirar()
         }
@@ -71,7 +76,7 @@ def index():
         if not flor.esta_expirada() and flor.dias_para_expirar() <= 2:
             alertas.append(lote)
     lotes.sort(key=lambda x: (x['variedade'], x['data_colheita']))
-    return render_template('index.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade, now=datetime.now())
+    return render_template('index.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade, now=agora_local())
 
 @app.route('/adicionar', methods=['GET', 'POST'])
 def adicionar():
@@ -80,17 +85,11 @@ def adicionar():
         data = request.form['data']
         quantidade = int(request.form['quantidade'])
         salvar_flor(variedade, data, quantidade)
-        salvar_entrada(variedade, quantidade, data)
+        salvar_entrada(variedade, quantidade, data)  # Garante que entrada seja salva
         return redirect(url_for('index'))
     return render_template('adicionar.html')
 
-@app.route('/remover')
-def remover():
-    flores_expiradas = Flor.query.filter(Flor.data_colheita + timedelta(days=7) < datetime.now().date()).all()
-    for flor in flores_expiradas:
-        db.session.delete(flor)
-    db.session.commit()
-    return redirect(url_for('index'))
+# Rota /remover removida
 
 @app.route('/saida', methods=['GET', 'POST'])
 def saida():
@@ -120,14 +119,14 @@ def relatorio():
             'variedade': flor.variedade,
             'quantidade': flor.quantidade,
             'data_colheita': flor.data_colheita,
-            'data_maxima': flor.data_colheita + timedelta(days=7),
+            'data_maxima': flor.data_colheita + timedelta(days=5),
             'expirada': flor.esta_expirada(),
             'dias_para_expirar': flor.dias_para_expirar()
         }
         lotes.append(lote)
         total_quantidade += flor.quantidade
     lotes.sort(key=lambda x: (x['variedade'], x['data_colheita']))
-    return render_template('relatorio.html', lotes=lotes, total_quantidade=total_quantidade, now=datetime.now())
+    return render_template('relatorio.html', lotes=lotes, total_quantidade=total_quantidade, now=agora_local())
 
 @app.route('/filtrar-semana', methods=['GET', 'POST'])
 def filtrar_semana():
@@ -146,7 +145,7 @@ def filtrar_semana():
                     'variedade': flor.variedade,
                     'quantidade': flor.quantidade,
                     'data_colheita': flor.data_colheita,
-                    'data_maxima': flor.data_colheita + timedelta(days=7),
+                    'data_maxima': flor.data_colheita + timedelta(days=5),
                     'expirada': flor.esta_expirada(),
                     'dias_para_expirar': flor.dias_para_expirar()
                 })
@@ -155,6 +154,10 @@ def filtrar_semana():
 @app.route('/historico-entradas')
 def historico_entradas():
     entradas = Entrada.query.order_by(Entrada.data_entrada.desc()).all()
+    # Debug: Imprimir no console (remova em produção)
+    print(f"Entradas encontradas: {len(entradas)}")
+    for entrada in entradas:
+        print(f"ID: {entrada.id}, Variedade: {entrada.variedade}, Quantidade: {entrada.quantidade}, Data: {entrada.data_entrada}")
     return render_template('historico.html', entradas=entradas)
 
 if __name__ == '__main__':
