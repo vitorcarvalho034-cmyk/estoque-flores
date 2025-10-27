@@ -1,457 +1,163 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estoque de Flores</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-        }
-        .navbar {
-            background: linear-gradient(90deg, #28a745 0%, #20c997 100%) !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: margin-left 0.3s ease;
-        }
+import os
+from flask import Flask, render_template, request, redirect, url_for
+from datetime import datetime, timedelta, timezone
+from flask_sqlalchemy import SQLAlchemy
 
-        /* Botão hambúrguer sempre visível */
-        .navbar-toggler {
-            border: none;
-            padding: 0.25rem 0.75rem;
-            background-color: #20c997 !important;
-            border-radius: 5px;
-        }
+app = Flask(__name__)
 
-        .navbar-toggler:focus {
-            box-shadow: 0 0 0 0.25rem rgba(32, 201, 151, 0.5);
-        }
+# Configuração do Banco de Dados
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///estoque.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-        .navbar-toggler-icon {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255,255,255,0.55)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-        }
-        
-        /* Overlay que aparece quando a sidebar abre */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-            z-index: 998;
-        }
+# Função para horário local (Brasília)
+def agora_local():
+    utc_now = datetime.now(timezone.utc)
+    return utc_now - timedelta(hours=3)  # Ajuste para seu fuso horário
 
-        .overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .sidebar {
-            height: 100%;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 250px;
-            background-color: #343a40;
-            padding-top: 20px;
-            padding-bottom: 20px;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-            z-index: 999;
-            overflow-y: auto;
-            overflow-x: hidden;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-        }
+# Modelo para Flores
+class Flor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    variedade = db.Column(db.String(100), nullable=False)
+    data_colheita = db.Column(db.Date, nullable=False)
+    quantidade = db.Column(db.Integer, nullable=False)
 
-        .sidebar.active {
-            transform: translateX(0);
-        }
+    def esta_expirada(self):
+        return agora_local().date() > (self.data_colheita + timedelta(days=5))  # 5 dias de validade
 
-        /* Cabeçalho da sidebar com botão de fechar */
-        .sidebar-header {
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #495057;
-        }
+    def dias_para_expirar(self):
+        hoje = agora_local().date()
+        return ((self.data_colheita + timedelta(days=5)) - hoje).days
 
-        .sidebar-header h5 {
-            color: white;
-            margin: 0;
-            font-weight: bold;
-        }
+# Modelo para Entradas
+class Entrada(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    variedade = db.Column(db.String(100), nullable=False)
+    quantidade = db.Column(db.Integer, nullable=False)
+    data_colheita = db.Column(db.Date, nullable=False)
+    data_entrada = db.Column(db.DateTime, default=lambda: agora_local())
 
-        .close-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
+# Criar tabelas
+with app.app_context():
+    db.create_all()
 
-        .close-btn:hover {
-            color: #28a745;
-        }
+# Funções auxiliares
+def carregar_estoque():
+    return Flor.query.all()
 
-        .sidebar a {
-            padding: 12px 15px;
-            text-decoration: none;
-            font-size: 1em;
-            color: white;
-            display: block;
-            transition: all 0.3s;
-            border-left: 4px solid transparent;
-            cursor: pointer;
-        }
+def salvar_flor(variedade, data, quantidade):
+    flor = Flor(variedade=variedade, data_colheita=datetime.strptime(data, "%Y-%m-%d").date(), quantidade=quantidade)
+    db.session.add(flor)
+    db.session.commit()
 
-        .sidebar a:hover {
-            background-color: #495057;
-            border-left-color: #28a745;
-            padding-left: 20px;
-        }
+def salvar_entrada(variedade, quantidade, data):
+    entrada = Entrada(variedade=variedade, quantidade=quantidade, data_colheita=datetime.strptime(data, "%Y-%m-%d").date())
+    db.session.add(entrada)
+    db.session.commit()
 
-        .sidebar .btn {
-            margin: 6px 10px;
-            width: calc(100% - 20px);
-            border-radius: 5px;
-            padding: 0.3rem 0.4rem;
-            font-size: 0.7rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            line-height: 1.1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+# Rotas
+@app.route('/')
+def index():
+    flores = carregar_estoque()
+    lotes = []
+    alertas = []
+    total_quantidade = 0
+    for flor in flores:
+        lote = {
+            'variedade': flor.variedade,
+            'quantidade': flor.quantidade,
+            'data_colheita': flor.data_colheita,
+            'data_maxima': flor.data_colheita + timedelta(days=5),
+            'expirada': flor.esta_expirada(),
+            'dias_para_expirar': flor.dias_para_expirar()
         }
+        lotes.append(lote)
+        total_quantidade += flor.quantidade
+        if not flor.esta_expirada() and flor.dias_para_expirar() <= 2:
+            alertas.append(lote)
+    lotes.sort(key=lambda x: (x['variedade'], x['data_colheita']))
+    return render_template('index.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade, now=agora_local())
 
-        .sidebar .btn i {
-            margin-right: 0.15rem;
-            font-size: 0.8rem;
-        }
+@app.route('/adicionar', methods=['GET', 'POST'])
+def adicionar():
+    if request.method == 'POST':
+        variedade = request.form['variedade']
+        data = request.form['data']
+        quantidade = int(request.form['quantidade'])
+        salvar_flor(variedade, data, quantidade)
+        salvar_entrada(variedade, quantidade, data)
+        return redirect(url_for('index'))
+    return render_template('adicionar.html')
 
-        .content {
-            margin-left: 0;
-            padding: 20px;
-            transition: margin-left 0.3s ease;
-        }
+@app.route('/saida', methods=['GET', 'POST'])
+def saida():
+    if request.method == 'POST':
+        index_lote = int(request.form['lote_index'])
+        quantidade_saida = int(request.form['quantidade_saida'])
+        flores = carregar_estoque()
+        if 0 <= index_lote < len(flores):
+            flor = flores[index_lote]
+            if flor.quantidade >= quantidade_saida:
+                flor.quantidade -= quantidade_saida
+                if flor.quantidade == 0:
+                    db.session.delete(flor)
+                db.session.commit()
+        return redirect(url_for('index'))
+    flores = carregar_estoque()
+    lotes_disponiveis = [(i, f"{flor.variedade} - {flor.data_colheita} (Qtd: {flor.quantidade})") for i, flor in enumerate(flores)]
+    return render_template('saida.html', lotes=lotes_disponiveis)
 
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+@app.route('/relatorio')
+def relatorio():
+    flores = carregar_estoque()
+    lotes = []
+    total_quantidade = 0
+    for flor in flores:
+        lote = {
+            'variedade': flor.variedade,
+            'quantidade': flor.quantidade,
+            'data_colheita': flor.data_colheita,
+            'data_maxima': flor.data_colheita + timedelta(days=5),
+            'expirada': flor.esta_expirada(),
+            'dias_para_expirar': flor.dias_para_expirar()
         }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
-        }
-        .card-header {
-            background: linear-gradient(90deg, #007bff 0%, #6610f2 100%);
-            border-radius: 15px 15px 0 0 !important;
-            color: white;
-            font-weight: bold;
-        }
-        .btn {
-            border-radius: 25px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .btn:hover {
-            transform: scale(1.05);
-        }
-        .badge {
-            font-size: 0.9em;
-            border-radius: 20px;
-        }
-        .alerta {
-            background: linear-gradient(90deg, #dc3545 0%, #fd7e14 100%);
-            color: white;
-            border-radius: 10px;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
-        }
-        .list-group-item {
-            border: none;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            background: rgba(255,255,255,0.8);
-            transition: background 0.3s ease;
-        }
-        .list-group-item:hover {
-            background: rgba(255,255,255,1);
-        }
-        .form-control {
-            border-radius: 25px;
-            border: 2px solid #ddd;
-            transition: border-color 0.3s ease;
-        }
-        .form-control:focus {
-            border-color: #28a745;
-            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
-        }
-        .total-sum {
-            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
-            color: white;
-            font-weight: bold;
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-            margin-top: 20px;
-        }
+        lotes.append(lote)
+        total_quantidade += flor.quantidade
+    lotes.sort(key=lambda x: (x['variedade'], x['data_colheita']))
+    return render_template('relatorio.html', lotes=lotes, total_quantidade=total_quantidade, now=agora_local())
 
-        /* Estilos para o relatório integrado */
-        .relatorio-container {
-            display: none;
-        }
+@app.route('/filtrar-semana', methods=['GET', 'POST'])
+def filtrar_semana():
+    lotes_filtrados = []
+    periodo_selecionado = None
+    if request.method == 'POST':
+        data_inicio = request.form['data_inicio']
+        data_fim = request.form['data_fim']
+        data_inicio_dt = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        data_fim_dt = datetime.strptime(data_fim, "%Y-%m-%d").date()
+        periodo_selecionado = f"{data_inicio_dt.strftime('%d/%m/%Y')} - {data_fim_dt.strftime('%d/%m/%Y')}"
+        flores = carregar_estoque()
+        for flor in flores:
+            if data_inicio_dt <= flor.data_colheita <= data_fim_dt:
+                lotes_filtrados.append({
+                    'variedade': flor.variedade,
+                    'quantidade': flor.quantidade,
+                    'data_colheita': flor.data_colheita,
+                    'data_maxima': flor.data_colheita + timedelta(days=5),
+                    'expirada': flor.esta_expirada(),
+                    'dias_para_expirar': flor.dias_para_expirar()
+                })
+    return render_template('filtrar_semana.html', lotes=lotes_filtrados, periodo_selecionado=periodo_selecionado)
 
-        .relatorio-container.active {
-            display: block;
-        }
+@app.route('/historico-entradas')
+def historico_entradas():
+    entradas = Entrada.query.order_by(Entrada.data_entrada.desc()).all()
+    # Debug: Imprimir no console (remova em produção)
+    print(f"Entradas encontradas: {len(entradas)}")
+    for entrada in entradas:
+        print(f"ID: {entrada.id}, Variedade: {entrada.variedade}, Quantidade: {entrada.quantidade}, Data: {entrada.data_entrada}")
+    return render_template('historico.html', entradas=entradas)
 
-        .relatorio-header {
-            text-align: center;
-            border-bottom: 2px solid #28a745;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-
-        .relatorio-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .relatorio-table th, .relatorio-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        .relatorio-table th {
-            background-color: #f2f2f2;
-            font-weight: bold;
-        }
-
-        .relatorio-total {
-            text-align: center;
-            font-size: 1.2em;
-            font-weight: bold;
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #e9ecef;
-            border-radius: 5px;
-        }
-
-        .relatorio-buttons {
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .relatorio-buttons .btn {
-            margin: 0 5px;
-        }
-
-        @media print {
-            .no-print { display: none; }
-            body { background: white; }
-            .navbar, .sidebar, .overlay { display: none; }
-            .relatorio-container {
-                display: block !important;
-            }
-            .content {
-                padding: 0;
-            }
-        }
-
-        /* Responsividade */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Overlay -->
-    <div class="overlay" id="overlay"></div>
-
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container-fluid d-flex align-items-center">
-            <button class="navbar-toggler me-3" type="button" onclick="toggleSidebar()" style="display: block !important; order: -1;">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <a class="navbar-brand" href="#"><i class="fas fa-seedling"></i> Estoque de Flores</a>
-            <span class="navbar-text text-white ms-auto">Created by Vitor Manoel</span>
-        </div>
-    </nav>
-
-    <!-- Barra Lateral -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h5>Menu</h5>
-            <button class="close-btn" onclick="toggleSidebar()">&times;</button>
-        </div>
-        <a href="#" onclick="showEstoque(); return false;"><i class="fas fa-boxes"></i> Estoque</a>
-        <a href="/adicionar"><i class="fas fa-plus"></i> Adicionar Flor</a>
-        <a href="/saida"><i class="fas fa-minus"></i> Registrar Saída</a>
-        <!-- Link "Remover Expiradas" removido -->
-        <a href="/filtrar-semana"><i class="fas fa-calendar-week"></i> Filtrar por Semana</a>
-        <a href="/historico-entradas"><i class="fas fa-history"></i> Histórico de Entradas</a>
-        <a href="#" onclick="showRelatorio(); return false;"><i class="fas fa-file-alt"></i> Ver Relatório</a>
-        <button onclick="window.open('/relatorio', '_blank')" class="btn btn-info" style="width: 100%; max-width: calc(100% - 24px);"><i class="fas fa-print"></i> Imprimir</button>
-    </div>
-
-    <div class="content" id="content">
-        <div class="container mt-5">
-            <div class="row justify-content-center">
-                <div class="col-lg-10">
-
-                    <!-- SEÇÃO DE ESTOQUE -->
-                    <div id="estoque-section" class="estoque-container">
-                        <!-- Alertas -->
-                        {% if alertas %}
-                        <div class="alert alerta no-print" role="alert">
-                            <h5><i class="fas fa-exclamation-triangle"></i> Alertas de Expiração</h5>
-                            <ul class="mb-0">
-                                {% for alerta in alertas %}
-                                <li>{{ alerta.variedade }} - Expira em {{ alerta.dias_para_expirar }} dia(s) ({{ alerta.data_maxima.strftime('%d/%m/%Y') }})</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        {% endif %}
-
-                        <div class="card">
-                            <div class="card-header">
-                                <h4 class="mb-0"><i class="fas fa-boxes"></i> Estoque Atual (Lotes por Data)</h4>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-4">
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                        <input type="text" id="filtro" class="form-control" placeholder="Buscar por variedade ou data (ex.: rosa ou 14/10)">
-                                    </div>
-                                </div>
-                                {% if lotes %}
-                                <ul class="list-group list-group-flush" id="lista-lotes">
-                                    {% for lote in lotes %}
-                                    <li class="list-group-item d-flex justify-content-between align-items-center lote-item" data-variedade="{{ lote.variedade }}" data-data="{{ lote.data_colheita.strftime('%d/%m/%Y') }}">
-                                        <div>
-                                            <strong><i class="fas fa-flower"></i> {{ lote.variedade }}</strong> - Quantidade: {{ lote.quantidade }}<br>
-                                            <small class="text-muted">Colheita: {{ lote.data_colheita.strftime('%d/%m/%Y') }} | Máxima: {{ lote.data_maxima.strftime('%d/%m/%Y') }} ({{ lote.dias_para_expirar }} dia(s) para expirar)</small>
-                                        </div>
-                                        <span class="badge bg-{% if lote.expirada %}danger{% else %}success{% endif %}">
-                                            {% if lote.expirada %}<i class="fas fa-times"></i> Expirada{% else %}<i class="fas fa-check"></i> Válida{% endif %}
-                                        </span>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
-                                <!-- Somatória Total -->
-                                <div class="total-sum">
-                                    <i class="fas fa-calculator"></i> Total de Flores no Estoque: {{ total_quantidade }}
-                                </div>
-                                {% else %}
-                                <div class="text-center py-5">
-                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                    <p class="text-muted">Estoque vazio. Adicione flores!</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- SEÇÃO DE RELATÓRIO -->
-                    <div id="relatorio-section" class="relatorio-container">
-                        <div class="card">
-                            <div class="card-header">
-                                <h4 class="mb-0"><i class="fas fa-file-alt"></i> Relatório de Estoque</h4>
-                            </div>
-                            <div class="card-body">
-                                <div class="relatorio-header">
-                                    <h1><i class="fas fa-seedling"></i> Relatório de Estoque de Flores</h1>
-                                    <p>Data do Relatório: {{ now.strftime('%d/%m/%Y') }}</p>
-                                    <p>Created by Vitor Manoel</p>
-                                </div>
-                                {% if lotes %}
-                                <table class="relatorio-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Variedade</th>
-                                            <th>Quantidade</th>
-                                            <th>Data de Colheita</th>
-                                            <th>Data Máxima</th>
-                                            <th>Status</th>
-                                            <th>Dias para Expirar</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for lote in lotes %}
-                                        <tr>
-                                            <td>{{ lote.variedade }}</td>
-                                            <td>{{ lote.quantidade }}</td>
-                                            <td>{{ lote.data_colheita.strftime('%d/%m/%Y') }}</td>
-                                            <td>{{ lote.data_maxima.strftime('%d/%m/%Y') }}</td>
-                                            <td>{% if lote.expirada %}Expirada{% else %}Válida{% endif %}</td>
-                                            <td>{{ lote.dias_para_expirar }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                                <div class="relatorio-total">
-                                    <i class="fas fa-calculator"></i> Total de Flores no Estoque: {{ total_quantidade }}
-                                </div>
-                                {% else %}
-                                <p>Estoque vazio.</p>
-                                {% endif %}
-                                <div class="relatorio-buttons no-print">
-                                    <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Imprimir</button>
-                                    <button onclick="showEstoque()" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Filtro de busca
-        document.getElementById('filtro').addEventListener('input', function() {
-            const filtro = this.value.toLowerCase();
-            const itens = document.querySelectorAll('.lote-item');
-            itens.forEach(item => {
-                const variedade = item.getAttribute('data-variedade').toLowerCase();
-                const data = item.getAttribute('data-data');
-                if (variedade.includes(filtro) || data.includes(filtro)) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-        });
-
-        // Elementos do DOM
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('overlay');
-        const estoqueSection = document.getElementById('estoque-section');
-        const relatorioSection = document.getElementById('relatorio-section');
-
-        // Função para abrir/fechar a sidebar
-        function toggleSidebar()
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
