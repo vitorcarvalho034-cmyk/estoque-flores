@@ -152,10 +152,6 @@ def filtrar_semana():
 @app.route('/historico-entradas')
 def historico_entradas():
     entradas = Entrada.query.order_by(Entrada.data_entrada.desc()).all()
-    # Debug: Imprimir no console (remova em produção)
-    print(f"Entradas encontradas: {len(entradas)}")
-    for entrada in entradas:
-        print(f"ID: {entrada.id}, Variedade: {entrada.variedade}, Quantidade: {entrada.quantidade}, Data: {entrada.data_entrada}")
     return render_template('historico.html', entradas=entradas)
 
 if __name__ == '__main__':
