@@ -154,6 +154,15 @@ def historico_entradas():
     entradas = Entrada.query.order_by(Entrada.data_entrada.desc()).all()
     return render_template('historico.html', entradas=entradas)
 
+@app.route('/remover')
+def remover():
+    flores = carregar_estoque()
+    for flor in flores:
+        if flor.esta_expirada():
+            db.session.delete(flor)
+    db.session.commit()
+    return redirect(url_for('index'))
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
