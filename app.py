@@ -23,11 +23,11 @@ class Flor(db.Model):
     quantidade = db.Column(db.Integer, nullable=False)
 
     def esta_expirada(self):
-        return agora_local().date() > (self.data_colheita + timedelta(days=5))  # 5 dias de validade
+        return agora_local().date() > (self.data_colheita + timedelta(days=7))  # 7 dias de validade
 
     def dias_para_expirar(self):
         hoje = agora_local().date()
-        return ((self.data_colheita + timedelta(days=5)) - hoje).days
+        return ((self.data_colheita + timedelta(days=7)) - hoje).days  # 7 dias de validade
 
 # Modelo para Entradas
 class Entrada(db.Model):
@@ -67,7 +67,7 @@ def index():
             'variedade': flor.variedade,
             'quantidade': flor.quantidade,
             'data_colheita': flor.data_colheita,
-            'data_maxima': flor.data_colheita + timedelta(days=5),
+            'data_maxima': flor.data_colheita + timedelta(days=7),  # 7 dias
             'expirada': flor.esta_expirada(),
             'dias_para_expirar': flor.dias_para_expirar()
         }
@@ -117,7 +117,7 @@ def relatorio():
             'variedade': flor.variedade,
             'quantidade': flor.quantidade,
             'data_colheita': flor.data_colheita,
-            'data_maxima': flor.data_colheita + timedelta(days=5),
+            'data_maxima': flor.data_colheita + timedelta(days=7),  # 7 dias
             'expirada': flor.esta_expirada(),
             'dias_para_expirar': flor.dias_para_expirar()
         }
@@ -143,7 +143,7 @@ def filtrar_semana():
                     'variedade': flor.variedade,
                     'quantidade': flor.quantidade,
                     'data_colheita': flor.data_colheita,
-                    'data_maxima': flor.data_colheita + timedelta(days=5),
+                    'data_maxima': flor.data_colheita + timedelta(days=7),  # 7 dias
                     'expirada': flor.esta_expirada(),
                     'dias_para_expirar': flor.dias_para_expirar()
                 })
@@ -152,16 +152,11 @@ def filtrar_semana():
 @app.route('/historico-entradas')
 def historico_entradas():
     entradas = Entrada.query.order_by(Entrada.data_entrada.desc()).all()
+    # Debug: Imprimir no console (remova em produção)
+    print(f"Entradas encontradas: {len(entradas)}")
+    for entrada in entradas:
+        print(f"ID: {entrada.id}, Variedade: {entrada.variedade}, Quantidade: {entrada.quantidade}, Data: {entrada.data_entrada}")
     return render_template('historico.html', entradas=entradas)
-
-@app.route('/remover')
-def remover():
-    flores = carregar_estoque()
-    for flor in flores:
-        if flor.esta_expirada():
-            db.session.delete(flor)
-    db.session.commit()
-    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
