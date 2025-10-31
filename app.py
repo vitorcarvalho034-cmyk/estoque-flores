@@ -94,7 +94,7 @@ def index():
         if not flor.esta_expirada() and flor.dias_para_expirar() <= 2:
             alertas.append(lote)
     lotes.sort(key=lambda x: (x['variedade'], x['data_colheita']))
-    return render_template('index_updated.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade, now=agora_local())
+    return render_template('index.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade, now=agora_local())
 
 @app.route('/adicionar', methods=['GET', 'POST'])
 def adicionar():
