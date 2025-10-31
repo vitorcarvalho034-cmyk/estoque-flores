@@ -2,11 +2,12 @@ import os
 from flask import Flask, render_template, request, redirect, url_for
 from datetime import datetime, timedelta, timezone
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 
 app = Flask(__name__)
 
 # Configuração do Banco de Dados
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///estoque.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///instance/estoque.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -41,8 +42,8 @@ class Entrada(db.Model):
 class MetaColheita(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     variedade = db.Column(db.String(100), nullable=False)
-    meta_diaria = db.Column(db.Integer, nullable=False)  # Meta diária
-    data = db.Column(db.Date, default=lambda: agora_local().date())
+    meta_quantidade = db.Column(db.Integer, nullable=False)  # Meta total de hastes
+    data_meta = db.Column(db.Date, nullable=False) # Data limite para atingir a meta
 
 # Modelo para Colheitas (Mercado e Barracão)
 class Colheita(db.Model):
@@ -93,7 +94,7 @@ def index():
         if not flor.esta_expirada() and flor.dias_para_expirar() <= 2:
             alertas.append(lote)
     lotes.sort(key=lambda x: (x['variedade'], x['data_colheita']))
-    return render_template('index.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade, now=agora_local())
+    return render_template('index_updated.html', lotes=lotes, alertas=alertas, total_quantidade=total_quantidade, now=agora_local())
 
 @app.route('/adicionar', methods=['GET', 'POST'])
 def adicionar():
@@ -109,20 +110,39 @@ def adicionar():
 @app.route('/saida', methods=['GET', 'POST'])
 def saida():
     if request.method == 'POST':
-        index_lote = int(request.form['lote_index'])
-        quantidade_saida = int(request.form['quantidade_saida'])
-        flores = carregar_estoque()
-        if 0 <= index_lote < len(flores):
-            flor = flores[index_lote]
-            if flor.quantidade >= quantidade_saida:
+        # Lógica de saída de estoque
+        try:
+            flor_id = int(request.form['flor_id'])
+            quantidade_saida = int(request.form['quantidade_saida'])
+            
+            flor = Flor.query.get(flor_id)
+            
+            if flor and flor.quantidade >= quantidade_saida:
                 flor.quantidade -= quantidade_saida
                 if flor.quantidade == 0:
                     db.session.delete(flor)
                 db.session.commit()
-        return redirect(url_for('index'))
+            
+            # Redireciona para a página de saída para recarregar a lista
+            return redirect(url_for('saida'))
+        except Exception as e:
+            # Em caso de erro, você pode querer adicionar uma mensagem de erro
+            print(f"Erro ao registrar saída: {e}")
+            return redirect(url_for('saida'))
+            
     flores = carregar_estoque()
-    lotes_disponiveis = [(i, f"{flor.variedade} - {flor.data_colheita} (Qtd: {flor.quantidade})") for i, flor in enumerate(flores)]
+    # Prepara a lista de lotes para o formulário de saída
+    lotes_disponiveis = [(flor.id, f"{flor.variedade} - {flor.data_colheita.strftime('%d/%m/%Y')} (Qtd: {flor.quantidade})") for flor in flores]
     return render_template('saida.html', lotes=lotes_disponiveis)
+
+@app.route('/remover')
+def remover():
+    flores = Flor.query.all()
+    for flor in flores:
+        if flor.esta_expirada():
+            db.session.delete(flor)
+    db.session.commit()
+    return redirect(url_for('index'))
 
 @app.route('/relatorio')
 def relatorio():
@@ -175,13 +195,36 @@ def historico_entradas():
 def metas():
     if request.method == 'POST':
         variedade = request.form['variedade']
-        meta_diaria = int(request.form['meta_diaria'])
-        meta = MetaColheita(variedade=variedade, meta_diaria=meta_diaria)
+        meta_quantidade = int(request.form['meta_quantidade'])
+        data_meta_str = request.form['data_meta']
+        data_meta = datetime.strptime(data_meta_str, "%Y-%m-%d").date()
+        
+        meta = MetaColheita(variedade=variedade, meta_quantidade=meta_quantidade, data_meta=data_meta)
         db.session.add(meta)
         db.session.commit()
         return redirect(url_for('metas'))
-    metas = MetaColheita.query.order_by(MetaColheita.data.desc()).all()
-    return render_template('metas.html', metas=metas)
+    
+    # Lógica para exibir metas
+    metas_query = MetaColheita.query.order_by(MetaColheita.data_meta.desc()).all()
+    metas_com_progresso = []
+    
+    for meta in metas_query:
+        # Soma o total de hastes colhidas para a variedade e dentro do período da meta
+        colhido_ate_agora = db.session.query(func.sum(Colheita.total_hastes)).filter(
+            Colheita.variedade == meta.variedade,
+            Colheita.data <= meta.data_meta
+        ).scalar() or 0
+        
+        meta_data = {
+            'id': meta.id,
+            'variedade': meta.variedade,
+            'meta_quantidade': meta.meta_quantidade,
+            'data_meta': meta.data_meta,
+            'colhido_ate_agora': colhido_ate_agora
+        }
+        metas_com_progresso.append(meta_data)
+        
+    return render_template('metas.html', metas=metas_com_progresso)
 
 @app.route('/colheitas', methods=['GET', 'POST'])
 def colheitas():
@@ -190,11 +233,15 @@ def colheitas():
         quantidade_mercado = int(request.form.get('quantidade_mercado', 0))
         quantidade_barracao = int(request.form.get('quantidade_barracao', 0))
         oferta_hastes = int(request.form['oferta_hastes'])
+        
+        # O total de hastes é a soma das unidades (mercado + barracão) multiplicada pela oferta de hastes por unidade
         total_hastes = (quantidade_mercado + quantidade_barracao) * oferta_hastes
+        
         colheita = Colheita(variedade=variedade, quantidade_mercado=quantidade_mercado, quantidade_barracao=quantidade_barracao, oferta_hastes=oferta_hastes, total_hastes=total_hastes)
         db.session.add(colheita)
         db.session.commit()
         return redirect(url_for('colheitas'))
+        
     colheitas = Colheita.query.order_by(Colheita.data.desc()).all()
     return render_template('colheitas.html', colheitas=colheitas)
 
@@ -207,7 +254,7 @@ def dashboard():
     for flor in flores:
         variedades_estoque[flor.variedade] = variedades_estoque.get(flor.variedade, 0) + flor.quantidade
 
-    # Estatísticas de colheita
+    # Estatísticas de colheita (Usando Entradas como proxy para o histórico de colheitas antigas)
     entradas = Entrada.query.all()
     total_colhido = sum(entrada.quantidade for entrada in entradas)
     colheita_por_variedade = {}
@@ -216,28 +263,68 @@ def dashboard():
         colheita_por_variedade[entrada.variedade] = colheita_por_variedade.get(entrada.variedade, 0) + entrada.quantidade
         mes = entrada.data_entrada.strftime('%Y-%m')
         colheita_por_mes[mes] = colheita_por_mes.get(mes, 0) + entrada.quantidade
+        
+    # Colheitas detalhadas (novas)
+    colheitas_detalhadas = Colheita.query.all()
+    for colheita in colheitas_detalhadas:
+        # Adiciona a colheita detalhada ao total colhido
+        total_colhido += colheita.quantidade_mercado + colheita.quantidade_barracao
+        # Adiciona ao dicionário de variedade (usando a soma das unidades como proxy)
+        colheita_por_variedade[colheita.variedade] = colheita_por_variedade.get(colheita.variedade, 0) + colheita.quantidade_mercado + colheita.quantidade_barracao
+        # Adiciona ao dicionário de mês
+        mes = colheita.data.strftime('%Y-%m')
+        colheita_por_mes[mes] = colheita_por_mes.get(mes, 0) + colheita.quantidade_mercado + colheita.quantidade_barracao
 
-    # Progresso vs. Meta
-    metas = MetaColheita.query.filter_by(data=agora_local().date()).all()
-    colheitas_hoje = Colheita.query.filter_by(data=agora_local().date()).all()
+    # Progresso vs. Meta (Metas ativas)
+    metas_ativas = MetaColheita.query.filter(MetaColheita.data_meta >= agora_local().date()).all()
     progresso = {}
     alertas_meta = []
-    for meta in metas:
-        total_colhido_hoje = sum(c.quantidade_mercado + c.quantidade_barracao for c in colheitas_hoje if c.variedade == meta.variedade)
-        percentual = (total_colhido_hoje / meta.meta_diaria) * 100 if meta.meta_diaria > 0 else 0
-        progresso[meta.variedade] = {'meta': meta.meta_diaria, 'colhido': total_colhido_hoje, 'percentual': percentual}
-        if percentual < 80:
-            alertas_meta.append(f"{meta.variedade}: {total_colhido_hoje}/{meta.meta_diaria} ({percentual:.1f}%) - Abaixo da meta!")
+    
+    for meta in metas_ativas:
+        # Soma o total de hastes colhidas para a variedade e dentro do período da meta (até hoje)
+        colhido_ate_agora = db.session.query(func.sum(Colheita.total_hastes)).filter(
+            Colheita.variedade == meta.variedade,
+            Colheita.data <= agora_local().date(),
+            Colheita.data <= meta.data_meta
+        ).scalar() or 0
+        
+        # Calcula o progresso percentual
+        percentual = (colhido_ate_agora / meta.meta_quantidade) * 100 if meta.meta_quantidade > 0 else 0
+        
+        # Adiciona ao dicionário de progresso (usando a meta total e o colhido até agora)
+        progresso[meta.variedade] = {'meta': meta.meta_quantidade, 'colhido': colhido_ate_agora, 'percentual': percentual}
+        
+        # Alerta se o progresso estiver muito baixo
+        if percentual < 50 and meta.data_meta - agora_local().date() < timedelta(days=7):
+            alertas_meta.append(f"Meta de {meta.variedade} ({meta.data_meta.strftime('%d/%m/%Y')}): {colhido_ate_agora}/{meta.meta_quantidade} ({percentual:.1f}%) - Baixo progresso e prazo próximo!")
+
+    # Para o gráfico de progresso, vamos usar as metas ativas
+    progresso_chart_data = {
+        'labels': list(progresso.keys()),
+        'meta': [p['meta'] for p in progresso.values()],
+        'colhido': [p['colhido'] for p in progresso.values()]
+    }
+    
+    # Ordena a colheita por mês para o gráfico
+    colheita_por_mes_ordenada = dict(sorted(colheita_por_mes.items()))
 
     return render_template('dashboard.html', 
                            total_estoque=total_estoque, 
                            variedades_estoque=variedades_estoque,
                            total_colhido=total_colhido,
                            colheita_por_variedade=colheita_por_variedade,
-                           colheita_por_mes=colheita_por_mes,
-                           progresso=progresso,
+                           colheita_por_mes=colheita_por_mes_ordenada,
+                           progresso=progresso_chart_data,
                            alertas_meta=alertas_meta)
 
 if __name__ == '__main__':
+    # Cria o diretório 'instance' se não existir (necessário para o SQLite)
+    if not os.path.exists('instance'):
+        os.makedirs('instance')
+    
+    # Recria as tabelas (apenas para desenvolvimento, em produção isso deve ser um `migrate`)
+    with app.app_context():
+        db.create_all()
+        
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

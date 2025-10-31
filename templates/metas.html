@@ -15,8 +15,25 @@
         .navbar {
             background: linear-gradient(90deg, #28a745 0%, #20c997 100%) !important;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: margin-left 0.3s ease;
         }
 
+        /* Botão hambúrguer sempre visível */
+        .navbar-toggler {
+            border: none;
+            padding: 0.25rem 0.75rem;
+            background-color: #20c997 !important;
+            border-radius: 5px;
+        }
+
+        .navbar-toggler:focus {
+            box-shadow: 0 0 0 0.25rem rgba(32, 201, 151, 0.5);
+        }
+
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255,255,255,0.55)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+        
         /* Overlay que aparece quando a sidebar abre */
         .overlay {
             position: fixed;
@@ -35,7 +52,7 @@
             opacity: 1;
             visibility: visible;
         }
-
+        
         .sidebar {
             height: 100%;
             position: fixed;
@@ -95,6 +112,7 @@
             display: block;
             transition: all 0.3s;
             border-left: 4px solid transparent;
+            cursor: pointer;
         }
 
         .sidebar a:hover {
@@ -140,4 +158,173 @@
             box-shadow: 0 15px 40px rgba(0,0,0,0.2);
         }
         .card-header {
-            background: linear-gradient(90deg, #
+            background: linear-gradient(90deg, #ffc107 0%, #fd7e14 100%);
+            border-radius: 15px 15px 0 0 !important;
+            color: white;
+            font-weight: bold;
+        }
+        .btn {
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        .form-control {
+            border-radius: 25px;
+            border: 2px solid #ddd;
+            transition: border-color 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+        .table {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .table th {
+            background-color: #f8f9fa;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid d-flex align-items-center">
+            <button class="navbar-toggler me-3" type="button" onclick="toggleSidebar()" style="display: block !important; order: -1;">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand" href="/"><i class="fas fa-seedling"></i> Estoque de Flores</a>
+            <span class="navbar-text text-white ms-auto">Created by Vitor Manoel</span>
+        </div>
+    </nav>
+
+    <!-- Barra Lateral -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h5>Menu</h5>
+            <button class="close-btn" onclick="toggleSidebar()">&times;</button>
+        </div>
+        <a href="/"><i class="fas fa-boxes"></i> Estoque</a>
+        <a href="/adicionar"><i class="fas fa-plus"></i> Adicionar Flor</a>
+        <a href="/saida"><i class="fas fa-minus"></i> Registrar Saída</a>
+        <a href="/remover"><i class="fas fa-trash"></i> Remover Expiradas</a>
+        <a href="/filtrar-semana"><i class="fas fa-calendar-week"></i> Filtrar por Semana</a>
+        <a href="/historico-entradas"><i class="fas fa-history"></i> Histórico de Entradas</a>
+        <a href="/metas"><i class="fas fa-bullseye"></i> Metas de Colheita</a>
+        <a href="/colheitas"><i class="fas fa-harvest"></i> Registro de Colheita</a>
+        <a href="/dashboard"><i class="fas fa-chart-bar"></i> Dashboard</a>
+        <a href="/relatorio" target="_blank"><i class="fas fa-file-alt"></i> Imprimir Relatório</a>
+    </div>
+
+    <div class="content" id="content">
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="mb-0"><i class="fas fa-bullseye"></i> Metas de Colheita</h4>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                <div class="mb-3">
+                                    <label for="variedade" class="form-label">Variedade</label>
+                                    <input type="text" class="form-control" id="variedade" name="variedade" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="meta_quantidade" class="form-label">Meta de Quantidade (Hastes)</label>
+                                    <input type="number" class="form-control" id="meta_quantidade" name="meta_quantidade" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="data_meta" class="form-label">Data Limite</label>
+                                    <input type="date" class="form-control" id="data_meta" name="data_meta" required>
+                                </div>
+                                <button type="submit" class="btn btn-warning">Adicionar Meta</button>
+                            </form>
+                            <hr>
+                            <h5>Metas Atuais</h5>
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Variedade</th>
+                                        <th>Meta (Hastes)</th>
+                                        <th>Data Limite</th>
+                                        <th>Progresso</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for meta in metas %}
+                                    <tr>
+                                        <td>{{ meta.id }}</td>
+                                        <td>{{ meta.variedade }}</td>
+                                        <td>{{ meta.meta_quantidade }}</td>
+                                        <td>{{ meta.data_meta.strftime('%d/%m/%Y') }}</td>
+                                        <td>
+                                            {% set progresso_percentual = (meta.colhido_ate_agora / meta.meta_quantidade) * 100 if meta.meta_quantidade > 0 else 0 %}
+                                            <div class="progress">
+                                                <div class="progress-bar bg-success" role="progressbar" style="width: {{ progresso_percentual }}%;" aria-valuenow="{{ progresso_percentual }}" aria-valuemin="0" aria-valuemax="100">
+                                                    {{ progresso_percentual | round(2) }}%
+                                                </div>
+                                            </div>
+                                            <small>{{ meta.colhido_ate_agora }} / {{ meta.meta_quantidade }} Hastes</small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Elementos do DOM
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+
+        // Função para abrir/fechar a sidebar
+        function toggleSidebar() {
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        // Fechar sidebar clicando no overlay
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        });
+
+        // Fechar sidebar ao pressionar ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            }
+        });
+
+        // Fechar sidebar ao clicar em um link
+        const sidebarLinks = document.querySelectorAll('.sidebar a');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -312,6 +312,9 @@
         <a href="/remover"><i class="fas fa-trash"></i> Remover Expiradas</a>
         <a href="/filtrar-semana"><i class="fas fa-calendar-week"></i> Filtrar por Semana</a>
         <a href="/historico-entradas"><i class="fas fa-history"></i> Histórico de Entradas</a>
+        <a href="/metas"><i class="fas fa-bullseye"></i> Metas de Colheita</a>
+        <a href="/colheitas"><i class="fas fa-harvest"></i> Registro de Colheita</a>
+        <a href="/dashboard"><i class="fas fa-chart-bar"></i> Dashboard</a>
         <a href="#" onclick="showRelatorio(); return false;"><i class="fas fa-file-alt"></i> Ver Relatório</a>
         <button onclick="window.open('/relatorio', '_blank')" class="btn btn-info" style="width: 100%; max-width: calc(100% - 24px);"><i class="fas fa-print"></i> Imprimir</button>
     </div>
@@ -320,94 +323,88 @@
         <div class="container mt-5">
             <div class="row justify-content-center">
                 <div class="col-lg-10">
-
-                    <!-- SEÇÃO DE ESTOQUE -->
-                    <div id="estoque-section" class="estoque-container">
-                        <!-- Alertas -->
-                        {% if alertas %}
-                        <div class="alert alerta no-print" role="alert">
-                            <h4 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Alertas de Expiração</h4>
-                            <ul>
-                                {% for alerta in alertas %}
-                                <li>{{ alerta.variedade }} - Expira em {{ alerta.dias_para_expirar }} dia(s) ({{ alerta.data_maxima.strftime('%d/%m/%Y') }})</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        {% endif %}
-
-                        <!-- Estoque Atual -->
+                    <!-- Seção Estoque -->
+                    <div id="estoque-section" class="estoque-section">
                         <div class="card">
                             <div class="card-header">
-                                <i class="fas fa-boxes"></i> Estoque Atual (Lotes por Data)
+                                <h4 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Alertas de Expiração</h4>
                             </div>
                             <div class="card-body">
-                                <div class="input-group mb-3 no-print">
+                                {% if alertas %}
+                                    <div class="alerta p-4 mb-4">
+                                        <h5 class="mb-3"><i class="fas fa-bell"></i> Flores com Vencimento Próximo</h5>
+                                        <ul class="list-unstyled">
+                                            {% for alerta in alertas %}
+                                            <li class="list-group-item mb-2">
+                                                <strong>{{ alerta.variedade }}</strong> - 
+                                                Colheita: {{ alerta.data_colheita.strftime('%d/%m/%Y') }} | 
+                                                Vence em: {{ alerta.dias_para_expirar }} dia(s)
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% else %}
+                                    <p class="text-success"><i class="fas fa-check-circle"></i> Nenhuma flor com vencimento próximo!</p>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="card mt-4">
+                            <div class="card-header">
+                                <h4 class="mb-0"><i class="fas fa-boxes"></i> Estoque Atual (Lotes por Data)</h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="input-group mb-3">
                                     <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                    <input type="text" class="form-control" placeholder="Buscar por variedade ou data (ex.: rosa ou 14/10)" id="searchInput" onkeyup="filterTable()">
+                                    <input type="text" class="form-control" id="searchInput" placeholder="Buscar por variedade ou data (ex.: rosa ou 14/10)">
                                 </div>
                                 {% if lotes %}
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead class="table-dark">
-                                            <tr>
-                                                <th>Variedade</th>
-                                                <th>Quantidade</th>
-                                                <th>Data de Colheita</th>
-                                                <th>Data Máxima</th>
-                                                <th>Status</th>
-                                                <th>Dias para Expirar</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for lote in lotes %}
-                                            <tr>
-                                                <td>{{ lote.variedade }}</td>
-                                                <td><span class="badge bg-primary">{{ lote.quantidade }}</span></td>
-                                                <td>{{ lote.data_colheita.strftime('%d/%m/%Y') }}</td>
-                                                <td>{{ lote.data_maxima.strftime('%d/%m/%Y') }}</td>
-                                                <td>
+                                    <div class="list-group" id="lotesList">
+                                        {% for lote in lotes %}
+                                        <div class="list-group-item lote-item" data-variedade="{{ lote.variedade }}" data-data="{{ lote.data_colheita.strftime('%d/%m/%Y') }}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h6 class="mb-1"><strong>{{ lote.variedade }}</strong></h6>
+                                                    <small class="text-muted">
+                                                        Colheita: {{ lote.data_colheita.strftime('%d/%m/%Y') }} | 
+                                                        Máxima: {{ lote.data_maxima.strftime('%d/%m/%Y') }}
+                                                    </small>
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge bg-info">{{ lote.quantidade }} unidades</span>
                                                     {% if lote.expirada %}
-                                                    <span class="badge bg-danger"><i class="fas fa-times-circle"></i> Expirada</span>
-                                                    {% else %}
-                                                    <span class="badge bg-success"><i class="fas fa-check-circle"></i> Válida</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    {% if lote.dias_para_expirar < 0 %}
-                                                    <span class="badge bg-danger">{{ lote.dias_para_expirar }}</span>
+                                                        <span class="badge bg-danger ms-2">Expirada</span>
                                                     {% elif lote.dias_para_expirar <= 2 %}
-                                                    <span class="badge bg-warning">{{ lote.dias_para_expirar }}</span>
+                                                        <span class="badge bg-warning ms-2">Expira em {{ lote.dias_para_expirar }} dia(s)</span>
                                                     {% else %}
-                                                    <span class="badge bg-info">{{ lote.dias_para_expirar }}</span>
+                                                        <span class="badge bg-success ms-2">Válida</span>
                                                     {% endif %}
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="total-sum">
-                                    <i class="fas fa-calculator"></i> Total de Flores no Estoque: {{ total_quantidade }}
-                                </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
                                 {% else %}
-                                <p>Estoque vazio.</p>
+                                    <p class="text-muted text-center py-5"><i class="fas fa-inbox fa-3x mb-3"></i><br>Nenhum lote no estoque</p>
                                 {% endif %}
+                                <div class="total-sum">
+                                    <i class="fas fa-chart-pie"></i> Total de Flores no Estoque: <strong>{{ total_quantidade }}</strong> unidades
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- SEÇÃO DE RELATÓRIO -->
+                    <!-- Seção Relatório -->
                     <div id="relatorio-section" class="relatorio-container">
                         <div class="card">
                             <div class="card-header">
-                                <i class="fas fa-file-alt"></i> Relatório de Estoque
+                                <h4 class="mb-0"><i class="fas fa-file-alt"></i> Relatório de Estoque</h4>
                             </div>
                             <div class="card-body">
                                 <div class="relatorio-header">
-                                    <h3>Relatório de Estoque de Flores</h3>
-                                    <p>Data do Relatório: {{ now.strftime('%d/%m/%Y') }}</p>
+                                    <h5>Relatório de Estoque de Flores</h5>
+                                    <p class="text-muted">Data do Relatório: {{ now.strftime('%d/%m/%Y %H:%M') }}</p>
                                 </div>
-                                {% if lotes %}
                                 <table class="relatorio-table">
                                     <thead>
                                         <tr>
@@ -416,7 +413,6 @@
                                             <th>Data de Colheita</th>
                                             <th>Data Máxima</th>
                                             <th>Status</th>
-                                            <th>Dias para Expirar</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -426,26 +422,29 @@
                                             <td>{{ lote.quantidade }}</td>
                                             <td>{{ lote.data_colheita.strftime('%d/%m/%Y') }}</td>
                                             <td>{{ lote.data_maxima.strftime('%d/%m/%Y') }}</td>
-                                            <td>{% if lote.expirada %}Expirada{% else %}Válida{% endif %}</td>
-                                            <td>{{ lote.dias_para_expirar }}</td>
+                                            <td>
+                                                {% if lote.expirada %}
+                                                    <span class="badge bg-danger">Expirada</span>
+                                                {% elif lote.dias_para_expirar <= 2 %}
+                                                    <span class="badge bg-warning">Expira em {{ lote.dias_para_expirar }} dia(s)</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">Válida</span>
+                                                {% endif %}
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
                                 <div class="relatorio-total">
-                                    <i class="fas fa-calculator"></i> Total de Flores no Estoque: {{ total_quantidade }}
+                                    Total de Flores: <strong>{{ total_quantidade }}</strong> unidades
                                 </div>
-                                {% else %}
-                                <p>Estoque vazio.</p>
-                                {% endif %}
-                                <div class="relatorio-buttons no-print">
+                                <div class="relatorio-buttons">
                                     <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Imprimir</button>
                                     <button onclick="showEstoque()" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -469,67 +468,57 @@
         function showEstoque() {
             estoqueSection.style.display = 'block';
             relatorioSection.classList.remove('active');
-            relatorioSection.style.display = 'none';
-            closeSidebar();
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
         }
 
         // Função para mostrar relatório
         function showRelatorio() {
             estoqueSection.style.display = 'none';
             relatorioSection.classList.add('active');
-            relatorioSection.style.display = 'block';
-            closeSidebar();
-        }
-
-        // Função para fechar sidebar
-        function closeSidebar() {
             sidebar.classList.remove('active');
             overlay.classList.remove('active');
         }
 
         // Fechar sidebar clicando no overlay
-        overlay.addEventListener('click', closeSidebar);
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        });
 
         // Fechar sidebar ao pressionar ESC
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                closeSidebar();
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
             }
         });
 
-        // Fechar sidebar ao clicar em um link (exceto os que chamam funções)
+        // Fechar sidebar ao clicar em um link
         const sidebarLinks = document.querySelectorAll('.sidebar a');
         sidebarLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                // Se o link não tiver onclick, fechar a sidebar
-                if (!this.getAttribute('onclick')) {
-                    closeSidebar();
+            link.addEventListener('click', () => {
+                if (!link.getAttribute('onclick')?.includes('showEstoque') && !link.getAttribute('onclick')?.includes('showRelatorio')) {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
                 }
             });
         });
 
-        // Função para filtrar a tabela de estoque
-        function filterTable() {
-            const input = document.getElementById('searchInput');
-            const filter = input.value.toUpperCase();
-            const table = document.querySelector('.table tbody');
-            const rows = table.getElementsByTagName('tr');
-
-            for (let i = 0; i < rows.length; i++) {
-                const cells = rows[i].getElementsByTagName('td');
-                let match = false;
-                for (let j = 0; j < cells.length; j++) {
-                    if (cells[j].textContent.toUpperCase().indexOf(filter) > -1) {
-                        match = true;
-                        break;
-                    }
+        // Função para filtrar lotes
+        document.getElementById('searchInput').addEventListener('keyup', function() {
+            const searchValue = this.value.toLowerCase();
+            const lotes = document.querySelectorAll('.lote-item');
+            lotes.forEach(lote => {
+                const variedade = lote.getAttribute('data-variedade').toLowerCase();
+                const data = lote.getAttribute('data-data').toLowerCase();
+                if (variedade.includes(searchValue) || data.includes(searchValue)) {
+                    lote.style.display = 'block';
+                } else {
+                    lote.style.display = 'none';
                 }
-                rows[i].style.display = match ? '' : 'none';
-            }
-        }
-
-        // Mostrar estoque por padrão
-        showEstoque();
+            });
+        });
     </script>
 </body>
 </html>
