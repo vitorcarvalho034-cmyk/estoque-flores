@@ -191,13 +191,21 @@ def historico_entradas():
     entradas = Entrada.query.order_by(Entrada.data_entrada.desc()).all()
     return render_template('historico.html', entradas=entradas)
 
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204 # Retorna 204 No Content para evitar o 404
+
 @app.route('/metas', methods=['GET', 'POST'])
 def metas():
     if request.method == 'POST':
         variedade = request.form['variedade']
         meta_quantidade = int(request.form['meta_quantidade'])
         data_meta_str = request.form['data_meta']
-        data_meta = datetime.strptime(data_meta_str, "%Y-%m-%d").date()
+        try:
+            data_meta = datetime.strptime(data_meta_str, "%Y-%m-%d").date()
+        except ValueError:
+            # Tratar erro de formato de data, se necessário
+            return redirect(url_for('metas')) # Redireciona para evitar o 500
         
         meta = MetaColheita(variedade=variedade, meta_quantidade=meta_quantidade, data_meta=data_meta)
         db.session.add(meta)
