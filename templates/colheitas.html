@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Histórico de Entradas</title>
+    <title>Registrar Colheitas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -140,10 +140,27 @@
             box-shadow: 0 15px 40px rgba(0,0,0,0.2);
         }
         .card-header {
-            background: linear-gradient(90deg, #6f42c1 0%, #e83e8c 100%);
+            background: linear-gradient(90deg, #17a2b8 0%, #28a745 100%);
             border-radius: 15px 15px 0 0 !important;
             color: white;
             font-weight: bold;
+        }
+        .btn {
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        .form-control {
+            border-radius: 25px;
+            border: 2px solid #ddd;
+            transition: border-color 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
         }
         .table {
             border-radius: 10px;
@@ -198,41 +215,54 @@
                 <div class="col-lg-10">
                     <div class="card">
                         <div class="card-header">
-                            <h4 class="mb-0"><i class="fas fa-history"></i> Histórico de Entradas</h4>
+                            <h4 class="mb-0"><i class="fas fa-leaf"></i> Registrar Colheitas</h4>
                         </div>
                         <div class="card-body">
-                            {% if entradas %}
+                            <form method="POST">
+                                <div class="mb-3">
+                                    <label for="variedade" class="form-label">Variedade</label>
+                                    <input type="text" class="form-control" id="variedade" name="variedade" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="quantidade_mercado" class="form-label">Quantidade Mercado</label>
+                                    <input type="number" class="form-control" id="quantidade_mercado" name="quantidade_mercado" value="0">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="quantidade_barracao" class="form-label">Quantidade Barracão</label>
+                                    <input type="number" class="form-control" id="quantidade_barracao" name="quantidade_barracao" value="0">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="oferta_hastes" class="form-label">Oferta (Hastes por Unidade)</label>
+                                    <input type="number" class="form-control" id="oferta_hastes" name="oferta_hastes" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Registrar Colheita</button>
+                            </form>
+                            <hr>
+                            <h5>Colheitas Registradas</h5>
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
                                         <th>Variedade</th>
-                                        <th>Quantidade</th>
-                                        <th>Data de Colheita</th>
-                                        <th>Data de Entrada</th>
+                                        <th>Mercado</th>
+                                        <th>Barracão</th>
+                                        <th>Total Hastes</th>
+                                        <th>Data</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for entrada in entradas %}
+                                    {% for colheita in colheitas %}
                                     <tr>
-                                        <td>{{ entrada.id }}</td>
-                                        <td>{{ entrada.variedade }}</td>
-                                        <td>{{ entrada.quantidade }}</td>
-                                        <td>{{ entrada.data_colheita.strftime('%d/%m/%Y') }}</td>
-                                        <td>{{ entrada.data_entrada.strftime('%d/%m/%Y %H:%M') }}</td>
+                                        <td>{{ colheita.id }}</td>
+                                        <td>{{ colheita.variedade }}</td>
+                                        <td>{{ colheita.quantidade_mercado }}</td>
+                                        <td>{{ colheita.quantidade_barracao }}</td>
+                                        <td>{{ colheita.total_hastes }}</td>
+                                        <td>{{ colheita.data }}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
-                            {% else %}
-                            <div class="text-center py-5">
-                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                <p class="text-muted">Nenhuma entrada registrada ainda.</p>
-                            </div>
-                            {% endif %}
-                            <div class="text-center mt-4">
-                                <a href="/" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar ao Estoque</a>
-                            </div>
                         </div>
                     </div>
                 </div>

@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Histórico de Entradas</title>
+    <title>Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -140,17 +141,32 @@
             box-shadow: 0 15px 40px rgba(0,0,0,0.2);
         }
         .card-header {
-            background: linear-gradient(90deg, #6f42c1 0%, #e83e8c 100%);
+            background: linear-gradient(90deg, #17a2b8 0%, #28a745 100%);
             border-radius: 15px 15px 0 0 !important;
             color: white;
             font-weight: bold;
         }
-        .table {
-            border-radius: 10px;
-            overflow: hidden;
+        .btn {
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
         }
-        .table th {
-            background-color: #f8f9fa;
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .alert {
+            background: linear-gradient(90deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+            border-radius: 10px;
         }
 
         /* Responsividade */
@@ -194,45 +210,65 @@
 
     <div class="content" id="content">
         <div class="container mt-5">
-            <div class="row justify-content-center">
-                <div class="col-lg-10">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card stat-card">
+                        <h5>Total em Estoque</h5>
+                        <div class="stat-number">{{ total_estoque }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card stat-card">
+                        <h5>Total Colhido</h5>
+                        <div class="stat-number">{{ total_colhido }}</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if alertas_meta %}
+            <div class="alert alert-danger mt-4">
+                <h5><i class="fas fa-exclamation-triangle"></i> Alertas de Meta</h5>
+                <ul>
+                    {% for alerta in alertas_meta %}
+                    <li>{{ alerta }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="row mt-4">
+                <div class="col-md-6">
                     <div class="card">
-                        <div class="card-header">
-                            <h4 class="mb-0"><i class="fas fa-history"></i> Histórico de Entradas</h4>
-                        </div>
+                        <div class="card-header">Estoque por Variedade</div>
                         <div class="card-body">
-                            {% if entradas %}
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Variedade</th>
-                                        <th>Quantidade</th>
-                                        <th>Data de Colheita</th>
-                                        <th>Data de Entrada</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for entrada in entradas %}
-                                    <tr>
-                                        <td>{{ entrada.id }}</td>
-                                        <td>{{ entrada.variedade }}</td>
-                                        <td>{{ entrada.quantidade }}</td>
-                                        <td>{{ entrada.data_colheita.strftime('%d/%m/%Y') }}</td>
-                                        <td>{{ entrada.data_entrada.strftime('%d/%m/%Y %H:%M') }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            {% else %}
-                            <div class="text-center py-5">
-                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                <p class="text-muted">Nenhuma entrada registrada ainda.</p>
-                            </div>
-                            {% endif %}
-                            <div class="text-center mt-4">
-                                <a href="/" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar ao Estoque</a>
-                            </div>
+                            <canvas id="estoqueChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Colheita por Variedade</div>
+                        <div class="card-body">
+                            <canvas id="colheitaChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Colheita por Mês</div>
+                        <div class="card-body">
+                            <canvas id="colheitaMesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Progresso vs. Meta</div>
+                        <div class="card-body">
+                            <canvas id="progressoChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -242,31 +278,83 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Elementos do DOM
+        // Gráfico de Estoque por Variedade
+        const estoqueCtx = document.getElementById('estoqueChart').getContext('2d');
+        new Chart(estoqueCtx, {
+            type: 'pie',
+            data: {
+                labels: {{ variedades_estoque.keys() | list | tojson }},
+                datasets: [{
+                    data: {{ variedades_estoque.values() | list }},
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']
+                }]
+            }
+        });
+
+        // Gráfico de Colheita por Variedade
+        const colheitaCtx = document.getElementById('colheitaChart').getContext('2d');
+        new Chart(colheitaCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ colheita_por_variedade.keys() | list | tojson }},
+                datasets: [{
+                    label: 'Quantidade Colhida',
+                    data: {{ colheita_por_variedade.values() | list }},
+                    backgroundColor: '#28a745'
+                }]
+            }
+        });
+
+        // Gráfico de Colheita por Mês
+        const colheitaMesCtx = document.getElementById('colheitaMesChart').getContext('2d');
+        new Chart(colheitaMesCtx, {
+            type: 'line',
+            data: {
+                labels: {{ colheita_por_mes.keys() | list | tojson }},
+                datasets: [{
+                    label: 'Colheita por Mês',
+                    data: {{ colheita_por_mes.values() | list }},
+                    borderColor: '#20c997',
+                    fill: false
+                }]
+            }
+        });
+
+        // Gráfico de Progresso vs. Meta
+        const progressoCtx = document.getElementById('progressoChart').getContext('2d');
+        new Chart(progressoCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ progresso.keys() | list | tojson }},
+                datasets: [{
+                    label: 'Meta Diária',
+                    data: {{ progresso.values() | list | map(attribute='meta') | list }},
+                    backgroundColor: '#dc3545'
+                }, {
+                    label: 'Colhido Hoje',
+                    data: {{ progresso.values() | list | map(attribute='colhido') | list }},
+                    backgroundColor: '#17a2b8'
+                }]
+            }
+        });
+
+        // JavaScript da sidebar
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
-
-        // Função para abrir/fechar a sidebar
         function toggleSidebar() {
             sidebar.classList.toggle('active');
             overlay.classList.toggle('active');
         }
-
-        // Fechar sidebar clicando no overlay
         overlay.addEventListener('click', () => {
             sidebar.classList.remove('active');
             overlay.classList.remove('active');
         });
-
-        // Fechar sidebar ao pressionar ESC
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 sidebar.classList.remove('active');
                 overlay.classList.remove('active');
             }
         });
-
-        // Fechar sidebar ao clicar em um link
         const sidebarLinks = document.querySelectorAll('.sidebar a');
         sidebarLinks.forEach(link => {
             link.addEventListener('click', () => {
