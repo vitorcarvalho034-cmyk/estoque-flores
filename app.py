@@ -198,19 +198,21 @@ def favicon():
 @app.route('/metas', methods=['GET', 'POST'])
 def metas():
     if request.method == 'POST':
-        variedade = request.form['variedade']
-        meta_quantidade = int(request.form['meta_quantidade'])
-        data_meta_str = request.form['data_meta']
         try:
+            variedade = request.form['variedade']
+            meta_quantidade = int(request.form['meta_quantidade'])
+            data_meta_str = request.form['data_meta']
             data_meta = datetime.strptime(data_meta_str, "%Y-%m-%d").date()
-        except ValueError:
-            # Tratar erro de formato de data, se necessário
-            return redirect(url_for('metas')) # Redireciona para evitar o 500
-        
-        meta = MetaColheita(variedade=variedade, meta_quantidade=meta_quantidade, data_meta=data_meta)
-        db.session.add(meta)
-        db.session.commit()
-        return redirect(url_for('metas'))
+            
+            meta = MetaColheita(variedade=variedade, meta_quantidade=meta_quantidade, data_meta=data_meta)
+            db.session.add(meta)
+            db.session.commit()
+            return redirect(url_for('metas'))
+        except Exception as e:
+            # Logar o erro para diagnóstico (útil em ambiente de produção)
+            print(f"Erro ao adicionar meta: {e}")
+            # Redireciona para evitar o 500, mantendo a experiência do usuário
+            return redirect(url_for('metas'))
     
     # Lógica para exibir metas
     metas_query = MetaColheita.query.order_by(MetaColheita.data_meta.desc()).all()
