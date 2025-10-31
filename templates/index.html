@@ -112,6 +112,7 @@
             display: block;
             transition: all 0.3s;
             border-left: 4px solid transparent;
+            cursor: pointer;
         }
 
         .sidebar a:hover {
@@ -172,4 +173,363 @@
         }
         .badge {
             font-size: 0.9em;
-            border
+            border-radius: 20px;
+        }
+        .alerta {
+            background: linear-gradient(90deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+            border-radius: 10px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+        .list-group-item {
+            border: none;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.8);
+            transition: background 0.3s ease;
+        }
+        .list-group-item:hover {
+            background: rgba(255,255,255,1);
+        }
+        .form-control {
+            border-radius: 25px;
+            border: 2px solid #ddd;
+            transition: border-color 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+        .total-sum {
+            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+            color: white;
+            font-weight: bold;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        /* Estilos para o relatório integrado */
+        .relatorio-container {
+            display: none;
+        }
+
+        .relatorio-container.active {
+            display: block;
+        }
+
+        .relatorio-header {
+            text-align: center;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .relatorio-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .relatorio-table th, .relatorio-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .relatorio-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        .relatorio-total {
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+
+        .relatorio-buttons {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .relatorio-buttons .btn {
+            margin: 0 5px;
+        }
+
+        @media print {
+            .no-print { display: none; }
+            body { background: white; }
+            .navbar, .sidebar, .overlay { display: none; }
+            .relatorio-container {
+                display: block !important;
+            }
+            .content {
+                padding: 0;
+            }
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid d-flex align-items-center">
+            <button class="navbar-toggler me-3" type="button" onclick="toggleSidebar()" style="display: block !important; order: -1;">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand" href="#"><i class="fas fa-seedling"></i> Estoque de Flores</a>
+            <span class="navbar-text text-white ms-auto">Created by Vitor Manoel</span>
+        </div>
+    </nav>
+
+    <!-- Barra Lateral -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h5>Menu</h5>
+            <button class="close-btn" onclick="toggleSidebar()">&times;</button>
+        </div>
+        <a href="#" onclick="showEstoque(); return false;"><i class="fas fa-boxes"></i> Estoque</a>
+        <a href="/adicionar"><i class="fas fa-plus"></i> Adicionar Flor</a>
+        <a href="/saida"><i class="fas fa-minus"></i> Registrar Saída</a>
+        <a href="/remover"><i class="fas fa-trash"></i> Remover Expiradas</a>
+        <a href="/filtrar-semana"><i class="fas fa-calendar-week"></i> Filtrar por Semana</a>
+        <a href="/historico-entradas"><i class="fas fa-history"></i> Histórico de Entradas</a>
+        <a href="#" onclick="showRelatorio(); return false;"><i class="fas fa-file-alt"></i> Ver Relatório</a>
+        <button onclick="window.open('/relatorio', '_blank')" class="btn btn-info" style="width: 100%; max-width: calc(100% - 24px);"><i class="fas fa-print"></i> Imprimir</button>
+    </div>
+
+    <div class="content" id="content">
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+
+                    <!-- SEÇÃO DE ESTOQUE -->
+                    <div id="estoque-section" class="estoque-container">
+                        <!-- Alertas -->
+                        {% if alertas %}
+                        <div class="alert alerta no-print" role="alert">
+                            <h4 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Alertas de Expiração</h4>
+                            <ul>
+                                {% for alerta in alertas %}
+                                <li>{{ alerta.variedade }} - Expira em {{ alerta.dias_para_expirar }} dia(s) ({{ alerta.data_maxima.strftime('%d/%m/%Y') }})</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <!-- Estoque Atual -->
+                        <div class="card">
+                            <div class="card-header">
+                                <i class="fas fa-boxes"></i> Estoque Atual (Lotes por Data)
+                            </div>
+                            <div class="card-body">
+                                <div class="input-group mb-3 no-print">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text" class="form-control" placeholder="Buscar por variedade ou data (ex.: rosa ou 14/10)" id="searchInput" onkeyup="filterTable()">
+                                </div>
+                                {% if lotes %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Variedade</th>
+                                                <th>Quantidade</th>
+                                                <th>Data de Colheita</th>
+                                                <th>Data Máxima</th>
+                                                <th>Status</th>
+                                                <th>Dias para Expirar</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for lote in lotes %}
+                                            <tr>
+                                                <td>{{ lote.variedade }}</td>
+                                                <td><span class="badge bg-primary">{{ lote.quantidade }}</span></td>
+                                                <td>{{ lote.data_colheita.strftime('%d/%m/%Y') }}</td>
+                                                <td>{{ lote.data_maxima.strftime('%d/%m/%Y') }}</td>
+                                                <td>
+                                                    {% if lote.expirada %}
+                                                    <span class="badge bg-danger"><i class="fas fa-times-circle"></i> Expirada</span>
+                                                    {% else %}
+                                                    <span class="badge bg-success"><i class="fas fa-check-circle"></i> Válida</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if lote.dias_para_expirar < 0 %}
+                                                    <span class="badge bg-danger">{{ lote.dias_para_expirar }}</span>
+                                                    {% elif lote.dias_para_expirar <= 2 %}
+                                                    <span class="badge bg-warning">{{ lote.dias_para_expirar }}</span>
+                                                    {% else %}
+                                                    <span class="badge bg-info">{{ lote.dias_para_expirar }}</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="total-sum">
+                                    <i class="fas fa-calculator"></i> Total de Flores no Estoque: {{ total_quantidade }}
+                                </div>
+                                {% else %}
+                                <p>Estoque vazio.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SEÇÃO DE RELATÓRIO -->
+                    <div id="relatorio-section" class="relatorio-container">
+                        <div class="card">
+                            <div class="card-header">
+                                <i class="fas fa-file-alt"></i> Relatório de Estoque
+                            </div>
+                            <div class="card-body">
+                                <div class="relatorio-header">
+                                    <h3>Relatório de Estoque de Flores</h3>
+                                    <p>Data do Relatório: {{ now.strftime('%d/%m/%Y') }}</p>
+                                </div>
+                                {% if lotes %}
+                                <table class="relatorio-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Variedade</th>
+                                            <th>Quantidade</th>
+                                            <th>Data de Colheita</th>
+                                            <th>Data Máxima</th>
+                                            <th>Status</th>
+                                            <th>Dias para Expirar</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for lote in lotes %}
+                                        <tr>
+                                            <td>{{ lote.variedade }}</td>
+                                            <td>{{ lote.quantidade }}</td>
+                                            <td>{{ lote.data_colheita.strftime('%d/%m/%Y') }}</td>
+                                            <td>{{ lote.data_maxima.strftime('%d/%m/%Y') }}</td>
+                                            <td>{% if lote.expirada %}Expirada{% else %}Válida{% endif %}</td>
+                                            <td>{{ lote.dias_para_expirar }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                <div class="relatorio-total">
+                                    <i class="fas fa-calculator"></i> Total de Flores no Estoque: {{ total_quantidade }}
+                                </div>
+                                {% else %}
+                                <p>Estoque vazio.</p>
+                                {% endif %}
+                                <div class="relatorio-buttons no-print">
+                                    <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Imprimir</button>
+                                    <button onclick="showEstoque()" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Elementos do DOM
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        const estoqueSection = document.getElementById('estoque-section');
+        const relatorioSection = document.getElementById('relatorio-section');
+
+        // Função para abrir/fechar a sidebar
+        function toggleSidebar() {
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        // Função para mostrar estoque
+        function showEstoque() {
+            estoqueSection.style.display = 'block';
+            relatorioSection.classList.remove('active');
+            relatorioSection.style.display = 'none';
+            closeSidebar();
+        }
+
+        // Função para mostrar relatório
+        function showRelatorio() {
+            estoqueSection.style.display = 'none';
+            relatorioSection.classList.add('active');
+            relatorioSection.style.display = 'block';
+            closeSidebar();
+        }
+
+        // Função para fechar sidebar
+        function closeSidebar() {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+
+        // Fechar sidebar clicando no overlay
+        overlay.addEventListener('click', closeSidebar);
+
+        // Fechar sidebar ao pressionar ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeSidebar();
+            }
+        });
+
+        // Fechar sidebar ao clicar em um link (exceto os que chamam funções)
+        const sidebarLinks = document.querySelectorAll('.sidebar a');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                // Se o link não tiver onclick, fechar a sidebar
+                if (!this.getAttribute('onclick')) {
+                    closeSidebar();
+                }
+            });
+        });
+
+        // Função para filtrar a tabela de estoque
+        function filterTable() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toUpperCase();
+            const table = document.querySelector('.table tbody');
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                let match = false;
+                for (let j = 0; j < cells.length; j++) {
+                    if (cells[j].textContent.toUpperCase().indexOf(filter) > -1) {
+                        match = true;
+                        break;
+                    }
+                }
+                rows[i].style.display = match ? '' : 'none';
+            }
+        }
+
+        // Mostrar estoque por padrão
+        showEstoque();
+    </script>
+</body>
+</html>
