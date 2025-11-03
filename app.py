@@ -262,6 +262,10 @@ def dashboard():
                            alertas_meta=alertas_meta,
                            previsao_semanal=previsao_semanal,
                            real_semanal=real_semanal)
+@app.route('/init-db')
+def init_db():
+    db.create_all()
+    return "Tabelas criadas com sucesso!"
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
