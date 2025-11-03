@@ -237,6 +237,10 @@ def dashboard():
                            colheita_por_mes=colheita_por_mes,
                            progresso=progresso,
                            alertas_meta=alertas_meta)
+@app.route('/init-db')
+def init_db():
+    db.create_all()
+    return "Tabelas criadas!"
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
