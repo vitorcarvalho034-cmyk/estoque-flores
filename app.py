@@ -37,21 +37,22 @@ class Entrada(db.Model):
     data_colheita = db.Column(db.Date, nullable=False)
     data_entrada = db.Column(db.DateTime, default=lambda: agora_local())
 
-# Modelo para Metas de Colheita (Corrigido)
+# Modelo para Metas de Colheita (com previsão semanal)
 class MetaColheita(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     variedade = db.Column(db.String(100), nullable=False)
     meta_diaria = db.Column(db.Integer, nullable=False)  # Meta diária
+    previsao_semanal = db.Column(db.Integer, nullable=False, default=0)  # Previsão de hastes por semana
     data = db.Column(db.Date, default=lambda: agora_local().date())
 
-# Modelo para Colheitas (Mercado e Barracão)
+# Modelo para Colheitas (atualizado com cestos)
 class Colheita(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     variedade = db.Column(db.String(100), nullable=False)
-    quantidade_mercado = db.Column(db.Integer, default=0)
-    quantidade_barracao = db.Column(db.Integer, default=0)
-    oferta_hastes = db.Column(db.Integer, nullable=False)  # Hastes por unidade
-    total_hastes = db.Column(db.Integer, nullable=False)  # Calculado: (mercado + barracao) * oferta
+    cestos_mercado = db.Column(db.Integer, default=0)
+    cestos_barracao = db.Column(db.Integer, default=0)
+    cestos_oferta = db.Column(db.Integer, default=0)
+    total_hastes = db.Column(db.Integer, nullable=False)  # Calculado
     data = db.Column(db.Date, default=lambda: agora_local().date())
 
 # Criar tabelas
@@ -176,7 +177,8 @@ def metas():
     if request.method == 'POST':
         variedade = request.form['variedade']
         meta_diaria = int(request.form['meta_diaria'])
-        meta = MetaColheita(variedade=variedade, meta_diaria=meta_diaria)
+        previsao_semanal = int(request.form.get('previsao_semanal', 0))
+        meta = MetaColheita(variedade=variedade, meta_diaria=meta_diaria, previsao_semanal=previsao_semanal)
         db.session.add(meta)
         db.session.commit()
         return redirect(url_for('metas'))
@@ -187,11 +189,20 @@ def metas():
 def colheitas():
     if request.method == 'POST':
         variedade = request.form['variedade']
-        quantidade_mercado = int(request.form.get('quantidade_mercado', 0))
-        quantidade_barracao = int(request.form.get('quantidade_barracao', 0))
-        oferta_hastes = int(request.form['oferta_hastes'])
-        total_hastes = (quantidade_mercado + quantidade_barracao) * oferta_hastes
-        colheita = Colheita(variedade=variedade, quantidade_mercado=quantidade_mercado, quantidade_barracao=quantidade_barracao, oferta_hastes=oferta_hastes, total_hastes=total_hastes)
+        cestos_mercado = int(request.form.get('cestos_mercado', 0))
+        cestos_barracao = int(request.form.get('cestos_barracao', 0))
+        cestos_oferta = int(request.form.get('cestos_oferta', 0))
+
+        # Cálculo de hastes com regras
+        hastes_mercado = cestos_mercado * 60
+        hastes_barracao = cestos_barracao * 50
+        if variedade in ['Cipria', 'Green Dark', 'Chispa', 'Sunny']:
+            hastes_oferta = cestos_oferta * 80
+        else:
+            hastes_oferta = cestos_oferta * 60
+        total_hastes = hastes_mercado + hastes_barracao + hastes_oferta
+
+        colheita = Colheita(variedade=variedade, cestos_mercado=cestos_mercado, cestos_barracao=cestos_barracao, cestos_oferta=cestos_oferta, total_hastes=total_hastes)
         db.session.add(colheita)
         db.session.commit()
         return redirect(url_for('colheitas'))
@@ -223,11 +234,23 @@ def dashboard():
     progresso = {}
     alertas_meta = []
     for meta in metas:
-        total_colhido_hoje = sum(c.quantidade_mercado + c.quantidade_barracao for c in colheitas_hoje if c.variedade == meta.variedade)
+        total_colhido_hoje = sum(c.total_hastes for c in colheitas_hoje if c.variedade == meta.variedade)
         percentual = (total_colhido_hoje / meta.meta_diaria) * 100 if meta.meta_diaria > 0 else 0
         progresso[meta.variedade] = {'meta': meta.meta_diaria, 'colhido': total_colhido_hoje, 'percentual': percentual}
         if percentual < 80:
             alertas_meta.append(f"{meta.variedade}: {total_colhido_hoje}/{meta.meta_diaria} ({percentual:.1f}%) - Abaixo da meta!")
+
+    # Previsão semanal vs. real
+    data_inicio_semana = agora_local().date() - timedelta(days=agora_local().weekday())
+    data_fim_semana = data_inicio_semana + timedelta(days=6)
+    metas = MetaColheita.query.filter(MetaColheita.data.between(data_inicio_semana, data_fim_semana)).all()
+    colheitas_semana = Colheita.query.filter(Colheita.data.between(data_inicio_semana, data_fim_semana)).all()
+    previsao_semanal = {}
+    real_semanal = {}
+    for meta in metas:
+        previsao_semanal[meta.variedade] = meta.previsao_semanal
+    for colheita in colheitas_semana:
+        real_semanal[colheita.variedade] = real_semanal.get(colheita.variedade, 0) + colheita.total_hastes
 
     return render_template('dashboard.html', 
                            total_estoque=total_estoque, 
@@ -236,11 +259,9 @@ def dashboard():
                            colheita_por_variedade=colheita_por_variedade,
                            colheita_por_mes=colheita_por_mes,
                            progresso=progresso,
-                           alertas_meta=alertas_meta)
-@app.route('/init-db')
-def init_db():
-    db.create_all()
-    return "Tabelas criadas!"
+                           alertas_meta=alertas_meta,
+                           previsao_semanal=previsao_semanal,
+                           real_semanal=real_semanal)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
