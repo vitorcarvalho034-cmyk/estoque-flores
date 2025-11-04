@@ -23,7 +23,7 @@ class Flor(db.Model):
     quantidade = db.Column(db.Integer, nullable=False)
 
     def esta_expirada(self):
-        return agora_local().date() > (self.data_colheita + timedelta(days=7))  # 7 dias de validade
+        return agora_local().date() > (self.data_colheita + timedelta(days=7))
 
     def dias_para_expirar(self):
         hoje = agora_local().date()
@@ -37,27 +37,28 @@ class Entrada(db.Model):
     data_colheita = db.Column(db.Date, nullable=False)
     data_entrada = db.Column(db.DateTime, default=lambda: agora_local())
 
-# Modelo para Metas de Colheita (com previsão semanal)
+# Modelo para Metas de Colheita (simplificado para semanal)
 class MetaColheita(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     variedade = db.Column(db.String(100), nullable=False)
-    meta_diaria = db.Column(db.Integer, nullable=False)  # Meta diária
-    previsao_semanal = db.Column(db.Integer, nullable=False, default=0)  # Previsão de hastes por semana
+    previsao_semanal = db.Column(db.Integer, nullable=False, default=0)
     data = db.Column(db.Date, default=lambda: agora_local().date())
 
-# Modelo para Colheitas (atualizado com cestos)
+# Modelo para Colheitas
 class Colheita(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     variedade = db.Column(db.String(100), nullable=False)
     cestos_mercado = db.Column(db.Integer, default=0)
     cestos_barracao = db.Column(db.Integer, default=0)
     cestos_oferta = db.Column(db.Integer, default=0)
-    total_hastes = db.Column(db.Integer, nullable=False)  # Calculado
+    total_hastes = db.Column(db.Integer, nullable=False)
     data = db.Column(db.Date, default=lambda: agora_local().date())
 
-# Criar tabelas
-with app.app_context():
+# Rota para inicializar banco (para Render)
+@app.route('/init-db')
+def init_db():
     db.create_all()
+    return "Tabelas criadas com sucesso!"
 
 # Funções auxiliares
 def carregar_estoque():
@@ -125,6 +126,17 @@ def saida():
     lotes_disponiveis = [(i, f"{flor.variedade} - {flor.data_colheita} (Qtd: {flor.quantidade})") for i, flor in enumerate(flores)]
     return render_template('saida.html', lotes=lotes_disponiveis)
 
+@app.route('/remover')
+def remover_expiradas():
+    flores = Flor.query.all()
+    expiradas_removidas = 0
+    for flor in flores:
+        if flor.esta_expirada():
+            db.session.delete(flor)
+            expiradas_removidas += 1
+    db.session.commit()
+    return redirect(url_for('index'))
+
 @app.route('/relatorio')
 def relatorio():
     flores = carregar_estoque()
@@ -176,19 +188,22 @@ def historico_entradas():
 def metas():
     if request.method == 'POST':
         variedade = request.form['variedade']
-        meta_diaria = int(request.form['meta_diaria'])
-        previsao_semanal = int(request.form.get('previsao_semanal', 0))
-        meta = MetaColheita(variedade=variedade, meta_diaria=meta_diaria, previsao_semanal=previsao_semanal)
+        previsao_semanal = int(request.form['previsao_semanal'])
+        meta = MetaColheita(variedade=variedade, previsao_semanal=previsao_semanal)
         db.session.add(meta)
         db.session.commit()
         return redirect(url_for('metas'))
     metas = MetaColheita.query.order_by(MetaColheita.data.desc()).all()
-    return render_template('metas.html', metas=metas)
+    total_previsao = sum(meta.previsao_semanal for meta in metas)
+    return render_template('metas.html', metas=metas, total_previsao=total_previsao)
 
 @app.route('/colheitas', methods=['GET', 'POST'])
 def colheitas():
     if request.method == 'POST':
-        variedade = request.form['variedade']
+        variedade = request.form.get('variedade', '').strip()  # Permite vazio
+        if not variedade:
+            variedade = 'Geral'  # Valor padrão se não informado
+        
         cestos_mercado = int(request.form.get('cestos_mercado', 0))
         cestos_barracao = int(request.form.get('cestos_barracao', 0))
         cestos_oferta = int(request.form.get('cestos_oferta', 0))
@@ -202,10 +217,17 @@ def colheitas():
             hastes_oferta = cestos_oferta * 60
         total_hastes = hastes_mercado + hastes_barracao + hastes_oferta
 
-        colheita = Colheita(variedade=variedade, cestos_mercado=cestos_mercado, cestos_barracao=cestos_barracao, cestos_oferta=cestos_oferta, total_hastes=total_hastes)
+        colheita = Colheita(
+            variedade=variedade,
+            cestos_mercado=cestos_mercado,
+            cestos_barracao=cestos_barracao,
+            cestos_oferta=cestos_oferta,
+            total_hastes=total_hastes
+        )
         db.session.add(colheita)
         db.session.commit()
         return redirect(url_for('colheitas'))
+    
     colheitas = Colheita.query.order_by(Colheita.data.desc()).all()
     return render_template('colheitas.html', colheitas=colheitas)
 
@@ -228,18 +250,6 @@ def dashboard():
         mes = entrada.data_entrada.strftime('%Y-%m')
         colheita_por_mes[mes] = colheita_por_mes.get(mes, 0) + entrada.quantidade
 
-    # Progresso vs. Meta
-    metas = MetaColheita.query.filter_by(data=agora_local().date()).all()
-    colheitas_hoje = Colheita.query.filter_by(data=agora_local().date()).all()
-    progresso = {}
-    alertas_meta = []
-    for meta in metas:
-        total_colhido_hoje = sum(c.total_hastes for c in colheitas_hoje if c.variedade == meta.variedade)
-        percentual = (total_colhido_hoje / meta.meta_diaria) * 100 if meta.meta_diaria > 0 else 0
-        progresso[meta.variedade] = {'meta': meta.meta_diaria, 'colhido': total_colhido_hoje, 'percentual': percentual}
-        if percentual < 80:
-            alertas_meta.append(f"{meta.variedade}: {total_colhido_hoje}/{meta.meta_diaria} ({percentual:.1f}%) - Abaixo da meta!")
-
     # Previsão semanal vs. real
     data_inicio_semana = agora_local().date() - timedelta(days=agora_local().weekday())
     data_fim_semana = data_inicio_semana + timedelta(days=6)
@@ -247,10 +257,14 @@ def dashboard():
     colheitas_semana = Colheita.query.filter(Colheita.data.between(data_inicio_semana, data_fim_semana)).all()
     previsao_semanal = {}
     real_semanal = {}
+    alertas_meta = []
     for meta in metas:
         previsao_semanal[meta.variedade] = meta.previsao_semanal
-    for colheita in colheitas_semana:
-        real_semanal[colheita.variedade] = real_semanal.get(colheita.variedade, 0) + colheita.total_hastes
+        total_colhido_semana = sum(c.total_hastes for c in colheitas_semana if c.variedade == meta.variedade)
+        percentual = (total_colhido_semana / meta.previsao_semanal) * 100 if meta.previsao_semanal > 0 else 0
+        real_semanal[meta.variedade] = total_colhido_semana
+        if percentual < 80:
+            alertas_meta.append(f"{meta.variedade}: {total_colhido_semana}/{meta.previsao_semanal} ({percentual:.1f}%) - Abaixo da previsão!")
 
     return render_template('dashboard.html', 
                            total_estoque=total_estoque, 
@@ -258,15 +272,10 @@ def dashboard():
                            total_colhido=total_colhido,
                            colheita_por_variedade=colheita_por_variedade,
                            colheita_por_mes=colheita_por_mes,
-                           progresso=progresso,
-                           alertas_meta=alertas_meta,
                            previsao_semanal=previsao_semanal,
-                           real_semanal=real_semanal)
-@app.route('/init-db')
-def init_db():
-    db.create_all()
-    return "Tabelas criadas com sucesso!"
+                           real_semanal=real_semanal,
+                           alertas_meta=alertas_meta)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
